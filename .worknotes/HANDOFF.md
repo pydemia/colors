@@ -9,9 +9,17 @@
 
 로컬에서 `pnpm build`, `pnpm test`(9개), `pnpm test:e2e`(데스크톱
 Chromium·모바일 WebKit 총 10개)를 통과했다. 자세한 확인 사실과
-미검증 항목은 [QA_REPORT.md](QA_REPORT.md)에 있다. GitHub Release와
-Vercel 프로덕션 URL은 작업 완료 후 이곳에 추가한다. 아래의 "애플리케이션
-코드, 테스트, 배포 설정은 아직 없다"는 시작 당시의 기록이다.
+미검증 항목은 [QA_REPORT.md](QA_REPORT.md)에 있다. PR #1을 병합하고
+[`v0.1.0` GitHub Release](https://github.com/pydemia/colors/releases/tag/v0.1.0)를
+게시했다. 태그는 병합 커밋 `0e8045f3`을 가리킨다.
+
+Vercel 팀 `pydemia-dev`(`team_dgJb9kcapE0SUFa5OWb9rLVY`)에 `colors`
+프로젝트를 만들고 GitHub 저장소를 연결했다. 프로덕션 배포는
+`https://colors-coral-six.vercel.app`에서 `Ready`이며, 실제 URL의
+데스크톱·모바일 브라우저 테스트 10개가 통과했다. 배포 ID와 검증 범위는
+[QA_REPORT.md](QA_REPORT.md)에 있다. 연결된 Vercel 앱은 조회가 가능하지만
+배포 도구 호출은 서버에서 제공되지 않아 Vercel CLI를 사용했다. 아래의
+"애플리케이션 코드, 테스트, 배포 설정은 아직 없다"는 시작 당시의 기록이다.
 
 작성일: 2026-09-29
 

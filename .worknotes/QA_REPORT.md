@@ -24,4 +24,11 @@
 - PowerPoint·VS Code·JetBrains·Vim·iTerm2·Windows Terminal·PuTTY에서 전용 파일 가져오기, 실제 화면, 되돌리기를 검증하지 않았다. 앱은 전용 파일 다운로드를 제공하지 않는다.
 - 사진 파일 업로드·다운로드·저장소·검색·추출은 구현하지 않았다. 사진 출처 데이터 구조는 후속 확장 자리다.
 - 인쇄용 CMYK·ICC와 실제 인쇄 결과는 검증하지 않았다. 발행물 시안은 화면용이다.
-- Vercel 프로덕션 URL의 QA 결과는 배포 뒤 별도로 이 문서에 기록한다.
+
+## 프로덕션 배포 확인
+
+- GitHub Release: [Colors v0.1.0](https://github.com/pydemia/colors/releases/tag/v0.1.0). 태그는 병합 커밋 `0e8045f3`을 가리킨다.
+- Vercel 프로젝트: `pydemia-7822/colors`, 배포 ID `dpl_3SJRpd3YqwJjCDZhM6j7omk7v9DP`.
+- 공개 주소: https://colors-coral-six.vercel.app. 직접 HTTP 요청에서 200과 앱 제목을 확인했다.
+- Vercel 원격 빌드는 Node.js 24.x, pnpm 10.34.5, `pnpm build`를 사용해 통과했고 배포는 `production / Ready`로 확인했다.
+- 같은 공개 주소에서 Playwright 10개를 다시 실행해 데스크톱 Chromium·모바일 WebKit의 주요 흐름을 모두 통과했다. 이 검증은 브라우저 모사 시안과 앱의 저장·파일 흐름에 관한 것이며 대상 프로그램에서 전용 파일을 가져온 결과가 아니다.
