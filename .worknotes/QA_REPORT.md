@@ -28,7 +28,7 @@
 ## 프로덕션 배포 확인
 
 - GitHub Release: [Colors v0.1.0](https://github.com/pydemia/colors/releases/tag/v0.1.0). 태그는 병합 커밋 `0e8045f3`을 가리킨다.
-- Vercel 프로젝트: `pydemia-7822/colors`, 배포 ID `dpl_3SJRpd3YqwJjCDZhM6j7omk7v9DP`.
+- Vercel 프로젝트: `pydemia-7822/colors`. 첫 CLI 프로덕션 배포 ID는 `dpl_3SJRpd3YqwJjCDZhM6j7omk7v9DP`이다. GitHub 저장소 연결 후 `main`의 문서 변경도 새 프로덕션 배포를 자동으로 시작하는 것을 확인했다.
 - 공개 주소: https://colors-coral-six.vercel.app. 직접 HTTP 요청에서 200과 앱 제목을 확인했다.
 - Vercel 원격 빌드는 Node.js 24.x, pnpm 10.34.5, `pnpm build`를 사용해 통과했고 배포는 `production / Ready`로 확인했다.
 - 같은 공개 주소에서 Playwright 10개를 다시 실행해 데스크톱 Chromium·모바일 WebKit의 주요 흐름을 모두 통과했다. 이 검증은 브라우저 모사 시안과 앱의 저장·파일 흐름에 관한 것이며 대상 프로그램에서 전용 파일을 가져온 결과가 아니다.
