@@ -32,3 +32,4 @@
 - 공개 주소: https://colors-coral-six.vercel.app. 직접 HTTP 요청에서 200과 앱 제목을 확인했다.
 - Vercel 원격 빌드는 Node.js 24.x, pnpm 10.34.5, `pnpm build`를 사용해 통과했고 배포는 `production / Ready`로 확인했다.
 - 같은 공개 주소에서 Playwright 10개를 다시 실행해 데스크톱 Chromium·모바일 WebKit의 주요 흐름을 모두 통과했다. 이 검증은 브라우저 모사 시안과 앱의 저장·파일 흐름에 관한 것이며 대상 프로그램에서 전용 파일을 가져온 결과가 아니다.
+- 2026-09-30: `colors.pydemia.ai`를 Vercel `colors` 프로젝트에 연결했다. Squarespace 권한 네임서버에서 `colors` CNAME이 `078c9c2ec479ca79.vercel-dns-017.com`을 반환했고, Vercel 도메인 검증은 `configured-correctly`였다. 새 주소의 HTTPS 요청이 200을 반환하고 브라우저에서 앱 제목과 첫 화면을 확인했다.

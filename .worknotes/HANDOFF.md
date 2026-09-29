@@ -3,7 +3,7 @@
 ## 2026-09-30 현재 상태
 
 아래 2026-09-29 기록은 기획 단계의 역사적 메모다. 현재 작업 브랜치는
-`codex/first-release`이고 React·Vite 기반 앱을 구현했다. 첫 공개 범위는
+`main`이고 React·Vite 기반 앱을 구현했다. 첫 공개 범위는
 [RELEASE_SCOPE.md](RELEASE_SCOPE.md)를 따른다. 사진 업로드·다운로드·저장소·
 검색·추출은 `준비 중`이며 프로그램별 전용 파일도 검증 전이다.
 
@@ -15,11 +15,15 @@ Chromium·모바일 WebKit 총 10개)를 통과했다. 자세한 확인 사실�
 
 Vercel 팀 `pydemia-dev`(`team_dgJb9kcapE0SUFa5OWb9rLVY`)에 `colors`
 프로젝트를 만들고 GitHub 저장소를 연결했다. 프로덕션 배포는
-`https://colors-coral-six.vercel.app`에서 `Ready`이며, 실제 URL의
+`https://colors.pydemia.ai`에서 `Ready`다. 기존 Vercel 공개 주소의
 데스크톱·모바일 브라우저 테스트 10개가 통과했다. 배포 ID와 검증 범위는
 [QA_REPORT.md](QA_REPORT.md)에 있다. 연결된 Vercel 앱은 조회가 가능하지만
 배포 도구 호출은 서버에서 제공되지 않아 Vercel CLI를 사용했다. 아래의
 "애플리케이션 코드, 테스트, 배포 설정은 아직 없다"는 시작 당시의 기록이다.
+
+`colors.pydemia.ai`는 Squarespace DNS의 `colors` CNAME을
+`078c9c2ec479ca79.vercel-dns-017.com`으로 지정해 연결했다. Vercel의 도메인
+검증과 HTTPS 접속을 확인했다. 기존 `colors-coral-six.vercel.app` 주소도 유효하다.
 
 작성일: 2026-09-29
 
