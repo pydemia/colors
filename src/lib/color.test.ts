@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  colorParts,
   conceptSeed,
   contrastRatio,
   generateCandidates,
@@ -20,6 +21,36 @@ describe("palette rules", () => {
     expect(candidates.flat().every((hex) => normalizeHex(hex) === hex)).toBe(
       true,
     );
+  });
+
+  it("offers noticeably different tones for every harmony while keeping usable text contrast", () => {
+    const harmonies = [
+      "monochromatic",
+      "analogous",
+      "complementary",
+      "splitComplementary",
+      "triadic",
+      "tetradic",
+    ] as const;
+    for (const seed of ["#336699", "#B5742A"]) {
+      for (const harmony of harmonies) {
+        const candidates = generateCandidates(seed, harmony);
+        const surfaceLightness = candidates.map((colors) => colorParts(colors[1]).l);
+        const accentLightness = candidates.map((colors) => colorParts(colors[3]).l);
+        expect(surfaceLightness[0] - surfaceLightness[1]).toBeGreaterThan(0.025);
+        expect(surfaceLightness[1] - surfaceLightness[2]).toBeGreaterThan(0.08);
+        expect(accentLightness[0] - accentLightness[1]).toBeGreaterThan(0.1);
+        expect(accentLightness[1] - accentLightness[2]).toBeGreaterThan(0.12);
+        expect(candidates.every((colors) => colors[0] === seed)).toBe(true);
+        expect(
+          candidates.every((colors) => contrastRatio(colors[2], colors[1]) >= 4.5),
+        ).toBe(true);
+        expect(generateCandidates(seed, harmony, 1)).toEqual(
+          generateCandidates(seed, harmony, 1),
+        );
+        expect(generateCandidates(seed, harmony, 1)).not.toEqual(candidates);
+      }
+    }
   });
 
   it("uses concept choices deterministically and changes the seed when the direction changes", () => {

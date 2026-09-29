@@ -136,6 +136,39 @@ const harmonyOffsets: Record<Harmony, [number, number]> = {
   tetradic: [90, 180],
 };
 
+export const candidateStyles = [
+  {
+    name: "은은한",
+    detail: "밝은 바탕 · 절제된 포인트",
+    surfaceL: 0.975,
+    surfaceC: 0.012,
+    inkL: 0.3,
+    accentL: [0.76, 0.69],
+    accentScale: 0.48,
+    analogousSpread: 1,
+  },
+  {
+    name: "선명한",
+    detail: "깨끗한 바탕 · 뚜렷한 포인트",
+    surfaceL: 0.935,
+    surfaceC: 0.028,
+    inkL: 0.21,
+    accentL: [0.61, 0.57],
+    accentScale: 1,
+    analogousSpread: 1.5,
+  },
+  {
+    name: "깊은",
+    detail: "색감 있는 바탕 · 묵직한 포인트",
+    surfaceL: 0.82,
+    surfaceC: 0.06,
+    inkL: 0.13,
+    accentL: [0.42, 0.52],
+    accentScale: 1.28,
+    analogousSpread: 2,
+  },
+] as const;
+
 export function generateCandidates(
   seedInput: string,
   harmony: Harmony,
@@ -146,29 +179,29 @@ export function generateCandidates(
   const base = colorParts(seed);
   const offsets = harmonyOffsets[harmony];
 
-  return [0, 1, 2].map((variant) => {
-    const step = generation * 3 + variant;
-    const shift = step * 9;
-    const accentC = Math.min(0.23, Math.max(0.09, base.c * 1.15 + 0.035));
-    const light = oklchHex(
-      0.965 - (step % 3) * 0.012,
-      0.018 + (step % 2) * 0.006,
-      base.h,
+  return candidateStyles.map((style) => {
+    const cycle = generation % 5;
+    const hueDrift = harmony === "monochromatic" ? 0 : (generation % 7) * 3;
+    const spread = harmony === "analogous" ? style.analogousSpread : 1;
+    const accentC = Math.min(
+      0.24,
+      Math.max(0.11, base.c * 1.25 + 0.035) * style.accentScale,
     );
-    const dark = oklchHex(0.235 + (step % 2) * 0.025, 0.035, base.h);
+    const light = oklchHex(
+      style.surfaceL - cycle * 0.006,
+      style.surfaceC,
+      base.h + offsets[0] * 0.15,
+    );
+    const dark = oklchHex(style.inkL + cycle * 0.004, 0.035, base.h);
     const fourth = oklchHex(
-      harmony === "monochromatic"
-        ? 0.72 - (step % 3) * 0.045
-        : 0.67 - (step % 3) * 0.025,
-      harmony === "monochromatic" ? Math.max(0.05, base.c * 0.65) : accentC,
-      base.h + offsets[0] + (offsets[0] === 0 ? 0 : shift),
+      style.accentL[0] - cycle * 0.008,
+      accentC,
+      base.h + offsets[0] * spread + hueDrift,
     );
     const fifth = oklchHex(
-      harmony === "monochromatic"
-        ? 0.46 + (step % 3) * 0.035
-        : 0.6 + (step % 3) * 0.025,
-      harmony === "monochromatic" ? Math.max(0.07, base.c) : accentC,
-      base.h + offsets[1] - (offsets[1] === 0 ? 0 : shift),
+      style.accentL[1] + cycle * 0.008,
+      accentC,
+      base.h + offsets[1] * spread - hueDrift,
     );
     return [seed, light, dark, fourth, fifth];
   });

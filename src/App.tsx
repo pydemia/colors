@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { UsagePreview } from "./components/UsagePreview";
 import {
+  candidateStyles,
   conceptSeed,
   contrastRatio,
   generateCandidates,
@@ -1052,6 +1053,12 @@ export default function App() {
                             ? "선택됨 ✓"
                             : "적용하기 ↗"}
                         </span>
+                      </span>
+                      <strong className="candidate-name">
+                        {candidateStyles[index].name}
+                      </strong>
+                      <span className="candidate-detail">
+                        {candidateStyles[index].detail}
                       </span>
                       <span className="candidate-swatches">
                         {colors.map((hex, colorIndex) => (

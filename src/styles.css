@@ -11,6 +11,7 @@
 }
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 100px;
 }
 body {
   margin: 0;
@@ -49,7 +50,7 @@ a {
   border: 0;
 }
 .app-shell {
-  overflow: hidden;
+  overflow: clip;
 }
 .site-header {
   height: 84px;
@@ -59,8 +60,9 @@ a {
   justify-content: space-between;
   border-bottom: 1px solid #d9dfd8;
   background: #fafbf8;
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 .brand {
   display: flex;
@@ -139,10 +141,10 @@ a {
   letter-spacing: 2px;
 }
 .saved-panel {
-  position: absolute;
+  position: fixed;
   right: 17%;
-  top: 72px;
-  z-index: 10;
+  top: 84px;
+  z-index: 31;
   width: min(420px, 92vw);
   max-height: 430px;
   overflow: auto;
@@ -680,6 +682,19 @@ a {
   font-family: "Noto Sans KR";
   font-size: 10px;
   letter-spacing: 0;
+}
+.candidate-name,
+.candidate-detail {
+  display: block;
+}
+.candidate-name {
+  margin-top: 13px;
+  font-size: 16px;
+}
+.candidate-detail {
+  margin-top: 4px;
+  color: #52665a;
+  font-size: 12px;
 }
 .candidate-swatches {
   display: flex;
@@ -1381,6 +1396,9 @@ a {
   }
 }
 @media (max-width: 700px) {
+  html {
+    scroll-padding-top: 120px;
+  }
   .site-header {
     height: auto;
     min-height: 72px;
@@ -1473,17 +1491,18 @@ a {
     min-height: 220px;
   }
   .candidate-grid {
-    gap: 6px;
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
   .candidate-card {
-    padding: 7px;
+    padding: 12px;
   }
   .candidate-top {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0;
   }
   .candidate-top span {
-    font-size: 8px;
+    font-size: 10px;
   }
   .candidate-swatches {
     height: 43px;

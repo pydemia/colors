@@ -124,7 +124,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export const GENERATOR_VERSION = "rules-1.0.0";
+export const GENERATOR_VERSION = "rules-1.1.0";
 export const STORAGE_KEY = "colors.projects.v1";
 
 function now(): string {
@@ -292,7 +292,11 @@ export function regenerate(project: Project): {
     source.kind === "baseColor" ? source.harmony : "analogous";
   const candidates = generateCandidates(seed, harmony, generationIndex);
   return {
-    project: { ...chooseCandidate(project, candidates[0]), source },
+    project: {
+      ...chooseCandidate(project, candidates[0]),
+      source,
+      generatorVersion: GENERATOR_VERSION,
+    },
     candidates,
   };
 }

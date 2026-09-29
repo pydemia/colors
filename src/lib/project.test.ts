@@ -12,6 +12,7 @@ import {
   moveSwatch,
   parseProject,
   regenerate,
+  GENERATOR_VERSION,
   saveProject,
   setRoleOverride,
   setRoleSwatch,
@@ -71,6 +72,7 @@ describe("project invariants", () => {
       next.project.source.kind === "baseColor" &&
         next.project.source.generationIndex,
     ).toBe(1);
+    expect(next.project.generatorVersion).toBe(GENERATOR_VERSION);
   });
 
   it("keeps role links bound to swatch IDs after reordering and updates the source when unlocked input changes", () => {
