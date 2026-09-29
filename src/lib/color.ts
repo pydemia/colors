@@ -1,0 +1,217 @@
+import { clampChroma, converter, formatHex } from "culori";
+
+export type Harmony =
+  | "monochromatic"
+  | "analogous"
+  | "complementary"
+  | "splitComplementary"
+  | "triadic"
+  | "tetradic";
+
+export type HueDirection = "warm" | "cool" | "neutral" | "any";
+export type Lightness = "light" | "balanced" | "dark";
+export type Saturation = "muted" | "balanced" | "vivid";
+export type Mood =
+  | "calm"
+  | "playful"
+  | "elegant"
+  | "fresh"
+  | "bold"
+  | "natural";
+
+export interface ConceptInput {
+  useCases: string[];
+  moods: Mood[];
+  hueDirection: HueDirection;
+  lightness: Lightness;
+  saturation: Saturation;
+  avoidHexes: string[];
+  note: string;
+}
+
+const toOklch = converter("oklch");
+
+export function normalizeHex(input: string): string | null {
+  const value = input.trim().toUpperCase();
+  return /^#[0-9A-F]{6}$/.test(value) ? value : null;
+}
+
+function wrapHue(hue: number): number {
+  return ((hue % 360) + 360) % 360;
+}
+
+export function oklchHex(l: number, c: number, h: number): string {
+  const mapped = clampChroma(
+    {
+      mode: "oklch" as const,
+      l: Math.max(0, Math.min(1, l)),
+      c: Math.max(0, c),
+      h: wrapHue(h),
+    },
+    "oklch",
+  );
+  return formatHex(mapped).toUpperCase();
+}
+
+export function colorParts(hex: string): { l: number; c: number; h: number } {
+  const parsed = toOklch(hex);
+  if (!parsed) throw new Error("유효하지 않은 색상입니다.");
+  return { l: parsed.l, c: parsed.c ?? 0, h: parsed.h ?? 220 };
+}
+
+export function tone(
+  hex: string,
+  hueOffset: number,
+  lightness: number,
+  chroma?: number,
+): string {
+  const source = colorParts(hex);
+  return oklchHex(
+    lightness,
+    chroma ?? Math.max(0.04, source.c),
+    source.h + hueOffset,
+  );
+}
+
+const moodHue: Record<Mood, number> = {
+  calm: 220,
+  playful: 34,
+  elegant: 292,
+  fresh: 154,
+  bold: 14,
+  natural: 120,
+};
+
+const directionHue: Record<HueDirection, number> = {
+  warm: 32,
+  cool: 218,
+  neutral: 125,
+  any: 262,
+};
+
+const lightnessValue: Record<Lightness, number> = {
+  light: 0.72,
+  balanced: 0.57,
+  dark: 0.43,
+};
+
+const chromaValue: Record<Saturation, number> = {
+  muted: 0.065,
+  balanced: 0.13,
+  vivid: 0.21,
+};
+
+export function conceptSeed(input: ConceptInput): string {
+  let hue = input.moods.length
+    ? moodHue[input.moods[0]]
+    : directionHue[input.hueDirection];
+  if (input.hueDirection === "warm" && hue > 95 && hue < 315) hue = 32;
+  if (input.hueDirection === "cool" && (hue < 110 || hue > 305)) hue = 218;
+  if (input.hueDirection === "neutral") hue = directionHue.neutral;
+
+  const avoidHues = input.avoidHexes.map((hex) => colorParts(hex).h);
+  for (
+    let attempt = 0;
+    attempt < 12 &&
+    avoidHues.some(
+      (avoided) => Math.abs(((hue - avoided + 540) % 360) - 180) < 24,
+    );
+    attempt += 1
+  ) {
+    hue = wrapHue(hue + 53);
+  }
+  return oklchHex(
+    lightnessValue[input.lightness],
+    chromaValue[input.saturation],
+    hue,
+  );
+}
+
+const harmonyOffsets: Record<Harmony, [number, number]> = {
+  monochromatic: [0, 0],
+  analogous: [-30, 30],
+  complementary: [180, 165],
+  splitComplementary: [-150, 150],
+  triadic: [-120, 120],
+  tetradic: [90, 180],
+};
+
+export function generateCandidates(
+  seedInput: string,
+  harmony: Harmony,
+  generation = 0,
+): string[][] {
+  const seed = normalizeHex(seedInput);
+  if (!seed) throw new Error("HEX 색상은 #RRGGBB 형식이어야 합니다.");
+  const base = colorParts(seed);
+  const offsets = harmonyOffsets[harmony];
+
+  return [0, 1, 2].map((variant) => {
+    const step = generation * 3 + variant;
+    const shift = step * 9;
+    const accentC = Math.min(0.23, Math.max(0.09, base.c * 1.15 + 0.035));
+    const light = oklchHex(
+      0.965 - (step % 3) * 0.012,
+      0.018 + (step % 2) * 0.006,
+      base.h,
+    );
+    const dark = oklchHex(0.235 + (step % 2) * 0.025, 0.035, base.h);
+    const fourth = oklchHex(
+      harmony === "monochromatic"
+        ? 0.72 - (step % 3) * 0.045
+        : 0.67 - (step % 3) * 0.025,
+      harmony === "monochromatic" ? Math.max(0.05, base.c * 0.65) : accentC,
+      base.h + offsets[0] + (offsets[0] === 0 ? 0 : shift),
+    );
+    const fifth = oklchHex(
+      harmony === "monochromatic"
+        ? 0.46 + (step % 3) * 0.035
+        : 0.6 + (step % 3) * 0.025,
+      harmony === "monochromatic" ? Math.max(0.07, base.c) : accentC,
+      base.h + offsets[1] - (offsets[1] === 0 ? 0 : shift),
+    );
+    return [seed, light, dark, fourth, fifth];
+  });
+}
+
+function linearChannel(channel: number): number {
+  const value = channel / 255;
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+export function luminance(hex: string): number {
+  const valid = normalizeHex(hex);
+  if (!valid) throw new Error("유효하지 않은 색상입니다.");
+  const r = linearChannel(Number.parseInt(valid.slice(1, 3), 16));
+  const g = linearChannel(Number.parseInt(valid.slice(3, 5), 16));
+  const b = linearChannel(Number.parseInt(valid.slice(5, 7), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrastRatio(foreground: string, background: string): number {
+  const first = luminance(foreground);
+  const second = luminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+export function suggestTextColor(
+  foreground: string,
+  background: string,
+  minimum = 4.5,
+): string {
+  if (contrastRatio(foreground, background) >= minimum) return foreground;
+  const source = colorParts(foreground);
+  let best: { hex: string; distance: number } | null = null;
+  for (let step = 8; step <= 96; step += 1) {
+    const l = step / 100;
+    const hex = oklchHex(l, Math.min(source.c, 0.13), source.h);
+    if (contrastRatio(hex, background) < minimum) continue;
+    const distance = Math.abs(l - source.l);
+    if (!best || distance < best.distance) best = { hex, distance };
+  }
+  if (best) return best.hex;
+  return contrastRatio("#000000", background) >=
+    contrastRatio("#FFFFFF", background)
+    ? "#000000"
+    : "#FFFFFF";
+}
