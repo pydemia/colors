@@ -5,7 +5,13 @@ import {
   normalizeHex,
   oklchHex,
   tone,
+  suggestTextColor,
+  colorParts,
 } from "./color";
+import {
+  createAnchor, defaultStudio, recommend, validateStudio, withinBounds,
+  type Studio,
+} from "./studio";
 
 export type Source =
   | {
@@ -29,7 +35,7 @@ export type Source =
     };
 
 export type Origin = "input" | "generated" | "autoExtracted" | "picked";
-export type RoleReason = "generated" | "contrastAccepted" | "userEdit" | null;
+export type RoleReason = "generated" | "contrastAccepted" | "userEdit" | "userBinding" | null;
 
 export interface Swatch {
   id: string;
@@ -57,8 +63,10 @@ export const roleKeys = {
     "success",
     "warning",
     "error",
+    "surface", "textMuted", "onPrimary", "onSuccess", "onWarning",
+    "onError", "focusRing",
   ],
-  publication: ["cover", "bodyBackground", "bodyText", "accent"],
+  publication: ["cover", "onCover", "bodyBackground", "bodyText", "accent"],
   powerPoint: [
     "dark1",
     "light1",
@@ -115,16 +123,19 @@ export type RoleSetName = keyof typeof roleKeys;
 export type RoleSets = Record<RoleSetName, Record<string, RoleBinding>>;
 
 export interface Project {
-  schemaVersion: 1;
+  schemaVersion: 2;
   projectId: string;
   source: Source;
   generatorVersion: string;
   swatches: Swatch[];
   roleSets: RoleSets;
   updatedAt: string;
+  studio: Studio;
+  sequence: { id: string; name: string; swatches: Swatch[];
+    roleSets: RoleSets; studio: Studio }[];
 }
 
-export const GENERATOR_VERSION = "rules-1.1.0";
+export const GENERATOR_VERSION = "intent-2.0.0";
 export const STORAGE_KEY = "colors.projects.v1";
 
 function now(): string {
@@ -139,7 +150,7 @@ function derived(swatchId: string, overrideHex: string): RoleBinding {
   return { swatchId, overrideHex, reason: "generated" };
 }
 
-export function makeRoleSets(hexes: string[]): RoleSets {
+function legacyRoleSets(hexes: string[]): RoleSets {
   const seed = hexes[0];
   const dark = hexes[2];
   const accentA = hexes[3];
@@ -161,9 +172,13 @@ export function makeRoleSets(hexes: string[]): RoleSets {
       success: derived("s1", green),
       warning: derived("s5", amber),
       error: derived("s5", red),
+      surface: ref("s2"), textMuted: ref("s3"), onPrimary: ref("s2"),
+      onSuccess: ref("s2"), onWarning: ref("s3"), onError: ref("s2"),
+      focusRing: ref("s1"),
     },
     publication: {
       cover: ref("s1"),
+      onCover: ref("s2"),
       bodyBackground: ref("s2"),
       bodyText: ref("s3"),
       accent: ref("s5"),
@@ -221,30 +236,124 @@ export function makeRoleSets(hexes: string[]): RoleSets {
   };
 }
 
-export function createProject(source: Source, colors: string[]): Project {
-  if (colors.length !== 5 || colors.some((hex) => !normalizeHex(hex))) {
-    throw new Error("팔레트는 유효한 HEX 색상 5개가 필요합니다.");
+export const roleContrastPairs: Record<RoleSetName,
+  { foreground: string; background: string; minimum: number; kind: string }[]> = {
+  web: [
+    ...["text", "textMuted", "link"].map(foreground =>
+      ({ foreground, background: "background", minimum: 4.5, kind: "일반 텍스트" })),
+    { foreground: "text", background: "surface", minimum: 4.5, kind: "일반 텍스트" },
+    ...["primary", "success", "warning", "error"].map(role =>
+      ({ foreground: `on${role[0].toUpperCase()}${role.slice(1)}`,
+        background: role, minimum: 4.5, kind: "일반 텍스트" })),
+    { foreground: "focusRing", background: "background", minimum: 3, kind: "비텍스트" },
+    { foreground: "primary", background: "background", minimum: 3, kind: "비텍스트" },
+  ],
+  publication: [
+    { foreground: "bodyText", background: "bodyBackground", minimum: 4.5, kind: "일반 텍스트" },
+    { foreground: "onCover", background: "cover", minimum: 4.5, kind: "일반 텍스트" },
+    { foreground: "accent", background: "bodyBackground", minimum: 4.5, kind: "일반 텍스트" },
+  ],
+  powerPoint: [
+    { foreground: "dark1", background: "light1", minimum: 4.5, kind: "일반 텍스트" },
+    { foreground: "accent1", background: "light1", minimum: 3, kind: "큰 텍스트/그래픽" },
+    ...[2, 3, 4, 5, 6].map(i => ({ foreground: `accent${i}`,
+      background: "light1", minimum: 3, kind: "그래픽" })),
+  ],
+  editor: ["foreground", "comment", "keyword", "string", "number",
+    "type", "function", "variable", "error", "warning"].map(foreground =>
+    ({ foreground, background: "background", minimum: 4.5, kind: "일반 텍스트" })),
+  terminal: ["foreground"].map(foreground =>
+    ({ foreground, background: "background", minimum: 4.5, kind: "일반 텍스트" })),
+};
+
+export function makeRoleSets(hexes: string[], studio?: Studio): RoleSets {
+  const roles = legacyRoleSets(hexes);
+  if (!studio) return roles;
+  const indexed = hexes.map((hex, i) => ({ hex, id: `s${i + 1}` }));
+  const byL = [...indexed].sort((a, b) => colorPartsForRole(a.hex) - colorPartsForRole(b.hex));
+  const background = studio.theme === "dark" ? byL[0] : byL.at(-1)!;
+  const ink = studio.theme === "dark" ? byL.at(-1)! : byL[0];
+  roles.web.background = ref(background.id);
+  roles.web.text = derived(ink.id, suggestTextColor(ink.hex, background.hex));
+  roles.web.surface = derived(background.id,
+    tone(background.hex, 0, studio.theme === "dark" ? 0.25 : 0.91, 0.018));
+  roles.web.textMuted = derived(ink.id,
+    suggestTextColor(tone(ink.hex, 0, studio.theme === "dark" ? 0.65 : 0.5, 0.02), background.hex));
+  roles.web.primary = derived("s1", suggestTextColor(hexes[0], background.hex, 3));
+  roles.web.link = derived("s1", suggestTextColor(hexes[0], background.hex));
+  roles.web.focusRing = derived("s1", suggestTextColor(hexes[0], background.hex, 3));
+  roles.publication.bodyBackground = ref(background.id);
+  roles.publication.bodyText = roles.web.text;
+  roles.powerPoint.light1 = ref(background.id);
+  roles.powerPoint.dark1 = roles.web.text;
+  for (const set of ["editor", "terminal"] as const) {
+    roles[set].background = ref(background.id);
+    roles[set].foreground = roles.web.text;
   }
+  for (let i = 0; i < 6; i++)
+    roles.powerPoint[`accent${i + 1}`] = ref(indexed[i % indexed.length].id);
+  for (const set of Object.keys(roleContrastPairs) as RoleSetName[])
+    for (const pair of roleContrastPairs[set]) {
+      const bg = roles[set][pair.background];
+      const fg = roles[set][pair.foreground];
+      const bgHex = bg.overrideHex ?? hexes[Number(bg.swatchId.slice(1)) - 1];
+      const fgHex = fg.overrideHex ?? hexes[Number(fg.swatchId.slice(1)) - 1];
+      roles[set][pair.foreground] = derived(fg.swatchId,
+        suggestTextColor(fgHex, bgHex, pair.minimum));
+    }
+  return roles;
+}
+function colorPartsForRole(hex: string): number {
+  return colorParts(hex).l;
+}
+
+function refreshRoles(project: Project, swatches: Swatch[]): RoleSets {
+  const sorted = [...swatches].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+  const automatic = makeRoleSets(sorted.map(s => s.hex), project.studio);
+  for (const set of Object.keys(roleKeys) as RoleSetName[])
+    for (const role of roleKeys[set]) {
+      const previous = project.roleSets[set][role];
+      if (["userEdit", "contrastAccepted", "userBinding"].includes(previous?.reason ?? ""))
+        automatic[set][role] = previous;
+    }
+  return automatic;
+}
+
+export function createProject(source: Source, colors: string[], config?: Studio): Project {
+  if (colors.length < 5 || colors.length > 16 || colors.some((hex) => !normalizeHex(hex))) {
+    throw new Error("팔레트는 유효한 HEX 색상 5~16개가 필요합니다.");
+  }
+  const studio = structuredClone(config ?? defaultStudio(source.kind === "baseColor"
+    ? [createAnchor(source.hex, 0)] : [],
+    source.kind === "concept" ? source : undefined,
+    source.kind === "baseColor" ? source.harmony : "analogous"));
+  studio.count = colors.length;
   const swatches: Swatch[] = colors.map((hex, index) => ({
     id: `s${index + 1}`,
     hex: normalizeHex(hex)!,
-    origin: source.kind === "baseColor" && index === 0 ? "input" : "generated",
-    locked: source.kind === "baseColor" && index === 0,
+    origin: studio.anchors.some(a => a.id === `s${index + 1}`) ? "input" : "generated",
+    locked: studio.anchors.find(a => a.id === `s${index + 1}`)?.locked ?? false,
   }));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectId: crypto.randomUUID(),
     source,
     generatorVersion: GENERATOR_VERSION,
     swatches,
-    roleSets: makeRoleSets(colors),
+    roleSets: makeRoleSets(colors, config ? studio : undefined),
     updatedAt: now(),
+    studio, sequence: [],
   };
 }
 
 export function chooseCandidate(project: Project, colors: string[]): Project {
-  if (colors.length !== 5 || colors.some((hex) => !normalizeHex(hex))) {
-    throw new Error("후보는 유효한 HEX 색상 5개여야 합니다.");
+  if (colors.length !== project.swatches.length || colors.some((hex) => !normalizeHex(hex))) {
+    throw new Error("후보의 색 개수 또는 HEX가 잘못되었습니다.");
+  }
+  for (const anchor of project.studio.anchors) {
+    const hex = colors[Number(anchor.id.slice(1)) - 1];
+    if (!hex || !withinBounds(anchor, hex))
+      throw new Error("후보가 고정색 또는 원색 기준 보정 한계를 넘었습니다.");
   }
   const swatches = project.swatches.map((swatch) =>
     swatch.locked
@@ -253,26 +362,10 @@ export function chooseCandidate(project: Project, colors: string[]): Project {
           ...swatch,
           hex:
             normalizeHex(colors[Number(swatch.id.slice(1)) - 1]) ?? swatch.hex,
-          origin: "generated" as Origin,
+          origin: swatch.origin,
         },
   );
-  const automatic = makeRoleSets(
-    ["s1", "s2", "s3", "s4", "s5"].map(
-      (id) => swatches.find((swatch) => swatch.id === id)!.hex,
-    ),
-  );
-  const roleSets = {} as RoleSets;
-  for (const set of Object.keys(roleKeys) as RoleSetName[]) {
-    roleSets[set] = {};
-    for (const role of roleKeys[set]) {
-      const previous = project.roleSets[set][role];
-      roleSets[set][role] =
-        previous?.reason === "userEdit" ||
-        previous?.reason === "contrastAccepted"
-          ? previous
-          : automatic[set][role];
-    }
-  }
+  const roleSets = refreshRoles(project, swatches);
   return { ...project, swatches, roleSets, updatedAt: now() };
 }
 
@@ -284,16 +377,11 @@ export function regenerate(project: Project): {
     throw new Error("사진 추출은 준비 중입니다.");
   const generationIndex = project.source.generationIndex + 1;
   const source = { ...project.source, generationIndex };
-  const seed =
-    source.kind === "baseColor"
-      ? source.hex
-      : project.swatches.find((swatch) => swatch.id === "s1")!.hex;
-  const harmony: Harmony =
-    source.kind === "baseColor" ? source.harmony : "analogous";
-  const candidates = generateCandidates(seed, harmony, generationIndex);
+  const studio = { ...project.studio, generation: project.studio.generation + 1 };
+  const candidates = recommend(studio).map(c => c.colors);
   return {
     project: {
-      ...chooseCandidate(project, candidates[0]),
+      ...chooseCandidate({ ...project, studio }, candidates[0]),
       source,
       generatorVersion: GENERATOR_VERSION,
     },
@@ -306,12 +394,20 @@ export function setSwatchLock(
   id: string,
   locked: boolean,
 ): Project {
+  const target = project.swatches.find(s => s.id === id);
+  if (!target) throw new Error("색상을 찾을 수 없습니다.");
+  const existing = project.studio.anchors.find(a => a.id === id);
+  const anchors = existing ? project.studio.anchors.map(a => a.id === id
+    ? { ...a, locked, ...(locked ? { fixedHex: target.hex } : {}) } : a)
+    : [...project.studio.anchors, { ...createAnchor(target.hex, Number(id.slice(1)) - 1,
+      project.swatches.length), locked }];
   return {
     ...project,
     swatches: project.swatches.map((swatch) =>
       swatch.id === id ? { ...swatch, locked } : swatch,
     ),
     updatedAt: now(),
+    studio: { ...project.studio, anchors },
   };
 }
 
@@ -332,7 +428,10 @@ export function setSwatchHex(
     project.source.kind === "baseColor" && id === "s1"
       ? { ...project.source, hex }
       : project.source;
-  return { ...project, swatches, source, updatedAt: now() };
+  const studio = { ...project.studio, anchors: project.studio.anchors.map(a =>
+    a.id === id ? { ...a, originalHex: hex } : a) };
+  const next = { ...project, studio };
+  return { ...next, swatches, source, roleSets: refreshRoles(next, swatches), updatedAt: now() };
 }
 
 export function moveSwatch(
@@ -369,7 +468,7 @@ export function setRoleSwatch(
 ): Project {
   if (!project.swatches.some((swatch) => swatch.id === swatchId))
     throw new Error("원본색을 찾을 수 없습니다.");
-  return setBinding(project, set, role, ref(swatchId));
+  return setBinding(project, set, role, { ...ref(swatchId), reason: "userBinding" });
 }
 
 function setBinding(
@@ -415,7 +514,8 @@ export function resetRole(
 ): Project {
   const previous = project.roleSets[set]?.[role];
   if (!previous) throw new Error("역할을 찾을 수 없습니다.");
-  return setBinding(project, set, role, ref(previous.swatchId));
+  const sorted = [...project.swatches].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+  return setBinding(project, set, role, makeRoleSets(sorted.map(s => s.hex), project.studio)[set][role]);
 }
 
 export function exportProject(project: Project): string {
@@ -450,7 +550,7 @@ export function parseProject(json: string): Project {
   } catch {
     throw new Error("JSON 형식이 올바르지 않습니다.");
   }
-  if (!isRecord(value) || value.schemaVersion !== 1) {
+  if (!isRecord(value) || (value.schemaVersion !== 1 && value.schemaVersion !== 2)) {
     throw new Error("지원하지 않는 프로젝트 버전입니다.");
   }
   if (
@@ -459,7 +559,7 @@ export function parseProject(json: string): Project {
     typeof value.generatorVersion !== "string" ||
     typeof value.updatedAt !== "string" ||
     !Array.isArray(value.swatches) ||
-    value.swatches.length !== 5 ||
+    value.swatches.length < 5 || value.swatches.length > 16 ||
     !isRecord(value.roleSets)
   ) {
     throw new Error("프로젝트의 필수 데이터가 없습니다.");
@@ -552,14 +652,18 @@ export function parseProject(json: string): Project {
       throw new Error("사진 선택점 좌표가 잘못되었습니다.");
     }
     ids.add(item.id);
+    item.hex = normalizeHex(item.hex)!;
   }
-  if (["s1", "s2", "s3", "s4", "s5"].some((id) => !ids.has(id))) {
+  if (value.swatches.some((_, i) => !ids.has(`s${i + 1}`))) {
     throw new Error("원본 팔레트의 색상 ID가 잘못되었습니다.");
   }
   for (const set of Object.keys(roleKeys) as RoleSetName[]) {
     const roles = value.roleSets[set];
     if (!isRecord(roles)) throw new Error(`${set} 역할 데이터가 없습니다.`);
     for (const role of roleKeys[set]) {
+      if (value.schemaVersion === 1 && !roles[role]) {
+        roles[role] = legacyRoleSets(value.swatches.map(s => (s as Record<string, string>).hex))[set][role];
+      }
       const binding = roles[role];
       if (
         !isRecord(binding) ||
@@ -570,14 +674,61 @@ export function parseProject(json: string): Project {
           (typeof binding.overrideHex === "string" &&
             normalizeHex(binding.overrideHex))
         ) ||
-        ![null, "generated", "contrastAccepted", "userEdit"].includes(
+        ![null, "generated", "contrastAccepted", "userEdit", "userBinding"].includes(
           binding.reason as string | null,
         ) ||
-        (binding.overrideHex === null) !== (binding.reason === null)
+        (binding.overrideHex === null) !==
+          (binding.reason === null || binding.reason === "userBinding")
       ) {
         throw new Error(`${set}.${role} 역할 참조가 잘못되었습니다.`);
       }
+      if (typeof binding.overrideHex === "string") binding.overrideHex = normalizeHex(binding.overrideHex)!;
     }
+  }
+  if (value.schemaVersion === 1) {
+    value.schemaVersion = 2;
+    const old = value as unknown as Project;
+    value.studio = defaultStudio(old.swatches.filter(s => s.locked || s.origin === "input")
+      .map(s => ({ ...createAnchor(s.hex, Number(s.id.slice(1)) - 1, old.swatches.length),
+        locked: s.locked })), old.source.kind === "concept" ? old.source : undefined,
+      old.source.kind === "baseColor" ? old.source.harmony : "analogous");
+    (value.studio as Studio).count = old.swatches.length;
+    value.sequence = [];
+    // v1 did not record manual swatch binding provenance: preserve every link.
+    for (const set of Object.keys(roleKeys) as RoleSetName[])
+      for (const role of roleKeys[set])
+        if (old.roleSets[set][role].reason === null)
+          old.roleSets[set][role].reason = "userBinding";
+  }
+  if (isRecord(value.studio) && value.studio.editingSpace === undefined)
+    value.studio.editingSpace = "oklch";
+  if (!validateStudio(value.studio) ||
+    (value.studio as Studio).anchors.some(a => !ids.has(a.id)) ||
+    (value.studio as Studio).count !== value.swatches.length)
+    throw new Error("스튜디오 설정 또는 앵커가 잘못되었습니다.");
+  (value.studio as Studio).anchors = (value.studio as Studio).anchors.map(a => ({ ...a,
+    originalHex: normalizeHex(a.originalHex)!,
+    ...(a.fixedHex ? { fixedHex: normalizeHex(a.fixedHex)! } : {}) }));
+  if ((value.studio as Studio).anchors.some(a => {
+    const swatch = (value.swatches as Swatch[]).find(s => s.id === a.id)!;
+    return swatch.locked !== a.locked || !withinBounds(a, swatch.hex);
+  })) throw new Error("앵커와 결과색의 잠금·보정 한계가 일치하지 않습니다.");
+  if ((value.swatches as Swatch[]).some(s => s.locked &&
+    !(value.studio as Studio).anchors.some(a => a.id === s.id)))
+    throw new Error("고정색의 앵커 데이터가 없습니다.");
+  if (!Array.isArray(value.sequence) || value.sequence.length > 5)
+    throw new Error("장면 데이터가 잘못되었습니다.");
+  if (new Set(value.sequence.map(s => isRecord(s) ? s.id : null)).size !== value.sequence.length)
+    throw new Error("장면 ID가 중복되었습니다.");
+  for (const scene of value.sequence) {
+    if (!isRecord(scene) || typeof scene.id !== "string" || !scene.id || typeof scene.name !== "string" ||
+      !Array.isArray(scene.swatches) || !isRecord(scene.roleSets) || !isRecord(scene.studio))
+      throw new Error("장면 데이터가 잘못되었습니다.");
+    const parsed = parseProject(JSON.stringify({ ...value, swatches: scene.swatches,
+      roleSets: scene.roleSets, studio: scene.studio, sequence: [] }));
+    scene.swatches = parsed.swatches;
+    scene.roleSets = parsed.roleSets;
+    scene.studio = parsed.studio;
   }
   return value as unknown as Project;
 }
@@ -601,6 +752,7 @@ export function saveProject(
   storage: Storage = localStorage,
 ): void {
   const projects = loadProjects(storage);
+  backupStorage(storage);
   const next = [
     project,
     ...projects.filter((item) => item.projectId !== project.projectId),
@@ -612,12 +764,18 @@ export function deleteProject(
   projectId: string,
   storage: Storage = localStorage,
 ): void {
+  const projects = loadProjects(storage).filter((item) => item.projectId !== projectId);
+  backupStorage(storage);
   storage.setItem(
     STORAGE_KEY,
-    JSON.stringify(
-      loadProjects(storage).filter((item) => item.projectId !== projectId),
-    ),
+    JSON.stringify(projects),
   );
+}
+
+function backupStorage(storage: Storage): void {
+  const raw = storage.getItem(STORAGE_KEY);
+  if (raw && !storage.getItem("colors.projects.v1.backup"))
+    storage.setItem("colors.projects.v1.backup", raw);
 }
 
 export function starterProject(): Project {

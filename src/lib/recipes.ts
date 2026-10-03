@@ -1,0 +1,20 @@
+export const recipeSource = "https://docs.google.com/document/d/1F8rPaVmubHpUNyWhhc_7u9ITIB1PMMk2H_KF8_XmFmM/edit";
+export const recipes = [
+  ["sage-rose", "서늘한 미스터리", "세이지 그린 · 연분홍", ["#9CAF88", "#E8C5C8", "#3F4A38"]],
+  ["sky-ivory", "표백된 여름", "연하늘 · 아이보리", ["#B0D4E3", "#FDF6E2", "#6B8E9E"]],
+  ["teal-orange", "영화적 대립", "틸 · 오렌지", ["#1E656D", "#F17105", "#E6DFD5"]],
+  ["rose-mint", "발랄한 휴양지", "로즈 핑크 · 민트", ["#E26D80", "#66C18C", "#FFF0F3"]],
+  ["coffee-olive", "성숙한 헤리티지", "커피 · 올리브", ["#4B3621", "#556B2F", "#D8CBB5"]],
+  ["magenta-navy", "디스토피아의 밤", "자홍 · 감청", ["#B80058", "#0B1B3D", "#FF2A85"]],
+  ["lime-violet", "매혹적인 경고", "라임 · 진보라", ["#D4FF00", "#30004A", "#14001F"]],
+  ["olive-sun", "조용한 햇살", "다크 올리브 · 연노랑", ["#3B3C2A", "#FFF3A1", "#8C8D6B"]],
+  ["amber-coffee", "일상적 안식처", "앰버 · 커피", ["#FFBF00", "#5C4033", "#FFF8E7"]],
+  ["apricot-blue", "질서와 온기", "살구 · 파랑", ["#1A5276", "#FBCEB1", "#F4F6F7"]],
+  ["ochre-lavender", "시적 거리감", "황토 · 라벤더", ["#C68B59", "#967BB6", "#DCD6E8"]],
+  ["terracotta-rose", "빛바랜 남유럽", "테라코타 · 회분홍", ["#CC4E36", "#C8ADAD", "#5A3D36"]],
+  ["pine-navy", "젖은 숲의 고요", "솔잎 · 감청", ["#234E3A", "#152238", "#4A6B56"]],
+  ["jade-lavender", "새벽 물안개", "옥색 · 라벤더", ["#7AC5CD", "#BDB0D0", "#385E65"]],
+  ["crimson-green", "왕좌의 비장미", "선홍 · 흑록", ["#D91A2A", "#0B1A12", "#C5A059"]],
+  ["coral-midnight", "작은 희망의 불씨", "코럴 · 미드나잇", ["#FF6F61", "#101820", "#4E3D59"]],
+].map(([id, name, detail, colors]) => ({ id: id as string,
+  name: name as string, detail: detail as string, colors: colors as string[] }));

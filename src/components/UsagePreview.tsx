@@ -20,6 +20,10 @@ export function UsagePreview({ project, active }: Props) {
       "--preview-secondary": color("secondary"),
       "--preview-accent": color("accent"),
       "--preview-link": color("link"),
+      "--preview-on-primary": color("onPrimary"),
+      "--preview-muted": color("textMuted"),
+      "--preview-surface": color("surface"),
+      "--preview-focus": color("focusRing"),
     } as CSSProperties;
     return (
       <div
@@ -45,8 +49,15 @@ export function UsagePreview({ project, active }: Props) {
             색이 메시지를 더 선명하게 만듭니다.
           </p>
           <div className="web-preview-actions">
-            <span className="preview-button">시작하기 ↗</span>
+            <button type="button" className="preview-button focus-demo" aria-label="시안 버튼 · 포커스 색 확인">시작하기 ↗</button>
             <span className="preview-link">더 알아보기 →</span>
+          </div>
+          <p className="preview-focus-help">Tab으로 버튼의 포커스 색을 확인하세요.</p>
+          <div className="preview-states" style={{ background: color("surface") }}>
+            {["success", "warning", "error"].map((role, i) =>
+              <span key={role} style={{ background: color(role),
+                color: color(`on${role[0].toUpperCase()}${role.slice(1)}`) }}>
+                {["✓ 저장 완료", "⚠ 확인 필요", "× 다시 시도"][i]}</span>)}
           </div>
         </div>
         <div className="web-preview-bottom">
@@ -62,6 +73,7 @@ export function UsagePreview({ project, active }: Props) {
   if (active === "publication") {
     const style = {
       "--cover": color("cover"),
+      "--cover-ink": color("onCover"),
       "--paper": color("bodyBackground"),
       "--ink": color("bodyText"),
       "--mark": color("accent"),

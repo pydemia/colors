@@ -1,0 +1,70 @@
+{
+  "files": [
+    {
+      "sha256": "C2A534D4DFE27BB4A6D365B39A108C04874655010A9D89C3A00CE61922FA86D5",
+      "path": "UPGRADE_SPEC.md"
+    },
+    {
+      "sha256": "4F06517CDD11A105B5BF9CA0EE2C857DE21D81A271C1F383F0D94E5F8CEBC291",
+      "path": "e2e\\flows.spec.ts"
+    },
+    {
+      "sha256": "C757A57A60EB9D592CB5EB81B3E7276B2C7C39965FC49045BDFC284B5C4CB786",
+      "path": "src\\App.tsx"
+    },
+    {
+      "sha256": "7D65159D83E011A8DC4188EF536C116D603F2D7CC9320322E1474F81D82DD14B",
+      "path": "src\\main.tsx"
+    },
+    {
+      "sha256": "FB83C81D19F3901C40E6E5A7A34CCD2772858DB84D141D841ECB2595002E55D0",
+      "path": "src\\styles.css"
+    },
+    {
+      "sha256": "E521F34F15BB8D2CE890FC6F3B7DBCFD631191B084ADC2C4BE680574A48ED32C",
+      "path": "src\\components\\StudioPanels.tsx"
+    },
+    {
+      "sha256": "C223207E7E474C6FF69A8C45F3B508EA008D79E5ABED7978B0C7B28C6C9B3F78",
+      "path": "src\\components\\UsagePreview.tsx"
+    },
+    {
+      "sha256": "FF252D65D1B0A2F1EF4CC0B107D53DEBA2A3C99B11D6F38761323E6CB6BBAA5B",
+      "path": "src\\lib\\color.test.ts"
+    },
+    {
+      "sha256": "CC21DD3BB9A666B585F3DC166B9377401BE015E3613D1DE3CC32B8E8410D170F",
+      "path": "src\\lib\\color.ts"
+    },
+    {
+      "sha256": "D6E3A6FFDC853B9F1936002849D61D76A772D47F27A2DC01AC3E26296AC5313A",
+      "path": "src\\lib\\exports.test.ts"
+    },
+    {
+      "sha256": "53A6B3E3992BAE3471F8A7E0EBE15B93A747F02DEAE008BA0B07BBE6198954CC",
+      "path": "src\\lib\\exports.ts"
+    },
+    {
+      "sha256": "B0F2DB4F6CE386497BE5CC8B48453805ABACD217434EA46B9EEBB7B942F014A3",
+      "path": "src\\lib\\project.test.ts"
+    },
+    {
+      "sha256": "A0D118F7F59FDCA30A1BB0B5F904C253281E39489FE175A01C78F0966B35DB90",
+      "path": "src\\lib\\project.ts"
+    },
+    {
+      "sha256": "9D24246DD69A67FF058AF99A8482099FE9914246251DA77732282276449BA008",
+      "path": "src\\lib\\recipes.ts"
+    },
+    {
+      "sha256": "228A58D35D20ED6206A3BB8188198BA0F17392348537DD4A14AA1AF59917FF7A",
+      "path": "src\\lib\\studio.test.ts"
+    },
+    {
+      "sha256": "6601B5780A973AF9491AF9E457F189237DF6545A19D69A7A9DD0E32AAE71B4CA",
+      "path": "src\\lib\\studio.ts"
+    }
+  ],
+  "revision": "implementation-b",
+  "snapshot": "C:\\Users\\pydemia\\AppData\\Local\\Temp\\colors-implementation-b"
+}

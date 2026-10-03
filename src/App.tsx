@@ -2,10 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { UsagePreview } from "./components/UsagePreview";
 import {
-  candidateStyles,
-  conceptSeed,
   contrastRatio,
-  generateCandidates,
   normalizeHex,
   suggestTextColor,
   type ConceptInput,
@@ -22,7 +19,6 @@ import {
   loadProjects,
   moveSwatch,
   parseProject,
-  regenerate,
   resetRole,
   roleKeys,
   saveProject,
@@ -34,7 +30,12 @@ import {
   type RoleSetName,
   type Source,
   type Swatch,
+  roleContrastPairs,
 } from "./lib/project";
+import { createAnchor, defaultStudio, parseColor, recommend, validateStudio, paletteWarnings, type Studio } from "./lib/studio";
+import { recipes } from "./lib/recipes";
+import { ColorAnalysis, ContextScenes, ExtendedExports, RefinementPanel,
+  SeedFields, StoryRecipes, StudioSettings } from "./components/StudioPanels";
 import "./styles.css";
 
 type StartMode = "concept" | "baseColor" | "photo";
@@ -90,6 +91,9 @@ const roleNames: Record<string, string> = {
   link: "링크",
   success: "성공",
   warning: "주의",
+  surface: "표면", textMuted: "보조 글자", onPrimary: "주색 위 글자",
+  onSuccess: "성공색 위 글자", onWarning: "주의색 위 글자",
+  onError: "오류색 위 글자", focusRing: "포커스 표시", onCover: "표지 글자",
   error: "오류",
   cover: "표지",
   bodyBackground: "본문 배경",
@@ -134,27 +138,7 @@ const roleNames: Record<string, string> = {
   brightWhite: "밝은 흰색",
 };
 
-const contrastPairs: Record<
-  RoleSetName,
-  { foreground: string; background: string; minimum: number }[]
-> = {
-  web: [
-    { foreground: "text", background: "background", minimum: 4.5 },
-    { foreground: "link", background: "background", minimum: 4.5 },
-  ],
-  publication: [
-    { foreground: "bodyText", background: "bodyBackground", minimum: 4.5 },
-  ],
-  powerPoint: [{ foreground: "dark1", background: "light1", minimum: 4.5 }],
-  editor: [
-    { foreground: "foreground", background: "background", minimum: 4.5 },
-    { foreground: "comment", background: "background", minimum: 4.5 },
-  ],
-  terminal: [
-    { foreground: "foreground", background: "background", minimum: 4.5 },
-    { foreground: "red", background: "background", minimum: 4.5 },
-  ],
-};
+const contrastPairs = roleContrastPairs;
 
 const defaultConcept: ConceptInput = {
   useCases: ["web"],
@@ -372,13 +356,15 @@ function RoleRow({
 
 export default function App() {
   const [mode, setMode] = useState<StartMode>("concept");
-  const [baseHex, setBaseHex] = useState("#466C9B");
+  const [creation, setCreation] = useState(() => defaultStudio([createAnchor("#466C9B", 0)], defaultConcept));
+  const baseHex = creation.anchors[0]?.originalHex ?? "#466C9B";
   const [harmony, setHarmony] = useState<Harmony>("analogous");
   const [concept, setConcept] = useState<ConceptInput>(defaultConcept);
   const [avoidDraft, setAvoidDraft] = useState("");
   const [project, setProject] = useState<Project | null>(null);
   const [candidates, setCandidates] = useState<string[][]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState(0);
+  const [candidateStudio, setCandidateStudio] = useState<Studio | null>(null);
   const [activeSet, setActiveSet] = useState<RoleSetName>("web");
   const [savedProjects, setSavedProjects] = useState<Project[]>([]);
   const [showSaved, setShowSaved] = useState(false);
@@ -399,22 +385,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 5000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  useEffect(() => {
     if (!project) return;
-    const timer = window.setTimeout(() => {
-      try {
-        saveProject(project);
-        setSavedProjects(loadProjects());
-      } catch {
-        setNotice("기기 저장에 실패했습니다. JSON 백업을 받아 주세요.");
-      }
-    }, 400);
-    return () => window.clearTimeout(timer);
+    try {
+      saveProject(project);
+      setSavedProjects(loadProjects());
+    } catch {
+      setNotice("기기 저장에 실패했습니다. JSON 백업을 받아 주세요.");
+    }
   }, [project]);
 
   const currentPairs = useMemo(
@@ -428,6 +405,7 @@ export default function App() {
         : [],
     [project, activeSet],
   );
+  const candidateRecommendations = useMemo(() => candidateStudio ? recommend(candidateStudio) : [], [candidateStudio]);
 
   function apply(
     update: (current: Project) => Project,
@@ -436,6 +414,9 @@ export default function App() {
     if (!project) return;
     try {
       setProject(update(project));
+      setSelectedCandidate(-1);
+      setCandidates([]);
+      setCandidateStudio(null);
       if (message) setNotice(message);
     } catch (error) {
       setNotice(
@@ -447,15 +428,13 @@ export default function App() {
   function generate(): void {
     try {
       let source: Source;
-      let seed: string;
       let selectedHarmony: Harmony;
       if (mode === "photo") return;
       if (mode === "baseColor") {
-        const valid = normalizeHex(baseHex);
-        if (!valid) throw new Error("기준색은 #RRGGBB 형식으로 입력해 주세요.");
-        source = { kind: "baseColor", hex: valid, harmony, generationIndex: 0 };
-        seed = valid;
-        selectedHarmony = harmony;
+        const valid = parseColor(baseHex);
+        if (!valid) throw new Error("1번째 입력색의 형식이 잘못되었습니다. 불투명 HEX/RGB/HSL/OKLCH 색을 입력하세요.");
+        source = { kind: "baseColor", hex: valid, harmony: creation.harmony, generationIndex: 0 };
+        selectedHarmony = creation.harmony;
       } else {
         const avoidHexes = avoidDraft.trim() ? [normalizeHex(avoidDraft)] : [];
         if (avoidHexes.includes(null))
@@ -465,13 +444,22 @@ export default function App() {
           avoidHexes: avoidHexes.filter((hex): hex is string => Boolean(hex)),
         };
         source = { kind: "concept", ...nextConcept, generationIndex: 0 };
-        seed = conceptSeed(nextConcept);
-        selectedHarmony = "analogous";
+        selectedHarmony = creation.harmony;
       }
-      const nextCandidates = generateCandidates(seed, selectedHarmony);
+      const anchors = mode === "baseColor" ? creation.anchors.map((a, i) => {
+        const hex = parseColor(a.originalHex);
+        if (!hex) throw new Error(`${i + 1}번째 입력색의 형식이 잘못되었습니다.`);
+        return { ...a, originalHex: hex };
+      }) : [];
+      const nextStudio = { ...creation, anchors, harmony: selectedHarmony,
+        concept: source.kind === "concept" ? source : { ...concept,
+          avoidHexes: avoidDraft.trim() ? [parseColor(avoidDraft) ?? "invalid"] : [] } };
+      if (!validateStudio(nextStudio)) throw new Error("색 개수·보정 한계·피할 색 설정을 확인해 주세요.");
+      const nextCandidates = recommend(nextStudio).map(c => c.colors);
       setCandidates(nextCandidates);
+      setCandidateStudio(nextStudio);
       setSelectedCandidate(0);
-      setProject(createProject(source, nextCandidates[0]));
+      setProject(createProject(source, nextCandidates[0], nextStudio));
       setActiveSet(
         source.kind === "concept" && source.useCases[0] in setNames
           ? (source.useCases[0] as RoleSetName)
@@ -479,11 +467,13 @@ export default function App() {
       );
       setNotice("팔레트 후보 3개를 만들었습니다.");
       window.setTimeout(
-        () =>
+        () => {
+          studioRef.current?.querySelector("h2")?.focus({ preventScroll: true });
           studioRef.current?.scrollIntoView({
-            behavior: "smooth",
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
             block: "start",
-          }),
+          });
+        },
         50,
       );
     } catch (error) {
@@ -495,7 +485,13 @@ export default function App() {
 
   function choose(index: number): void {
     if (!project || !candidates[index]) return;
-    setProject(chooseCandidate(project, candidates[index]));
+    const studio = candidateStudio ?? project.studio;
+    const swatches = [...project.swatches];
+    while (swatches.length < studio.count) {
+      const i = swatches.length;
+      swatches.push({ id: `s${i + 1}`, hex: candidates[index][i], locked: false, origin: "generated" });
+    }
+    setProject(chooseCandidate({ ...project, studio, swatches }, candidates[index]));
     setSelectedCandidate(index);
     setNotice(
       `${index + 1}번 후보를 적용했습니다. 잠긴 색과 직접 수정한 역할은 유지했습니다.`,
@@ -505,11 +501,12 @@ export default function App() {
   function regenerateCandidates(): void {
     if (!project) return;
     try {
-      const result = regenerate(project);
-      setProject(result.project);
-      setCandidates(result.candidates);
-      setSelectedCandidate(0);
-      setNotice("새 후보 3개를 만들었습니다. 잠긴 색은 유지했습니다.");
+      const base = candidateStudio ?? project.studio;
+      const studio = { ...base, generation: base.generation + 1 };
+      setCandidateStudio(studio);
+      setCandidates(recommend(studio).map(c => c.colors));
+      setSelectedCandidate(-1);
+      setNotice("새 후보 3개를 만들었습니다. 후보 카드를 선택하면 현재 결과에 적용합니다.");
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "후보를 만들지 못했습니다.",
@@ -549,6 +546,8 @@ export default function App() {
         return;
       setProject(imported);
       setCandidates([]);
+      setCandidateStudio(null);
+      setSelectedCandidate(-1);
       setActiveSet("web");
       setNotice(
         "프로젝트를 가져왔습니다. 사진 원본은 JSON에 포함되지 않습니다.",
@@ -632,6 +631,8 @@ export default function App() {
                     onClick={() => {
                       setProject(saved);
                       setCandidates([]);
+                      setCandidateStudio(null);
+                      setSelectedCandidate(-1);
                       setShowSaved(false);
                       setNotice("저장된 프로젝트를 열었습니다.");
                       window.setTimeout(
@@ -696,7 +697,7 @@ export default function App() {
               <em>쓰임</em>까지 생각합니다<span className="hero-stop">.</span>
             </h1>
             <p>
-              콘셉트와 한 가지 색에서 출발해, 실제 화면에 어울리는 팔레트로
+                콘셉트와 하나 이상의 색에서 출발해, 실제 화면에 어울리는 팔레트로
               완성하세요. 색마다 역할을 정하고 바로 비교할 수 있습니다.
             </p>
             <div className="hero-note">
@@ -769,6 +770,17 @@ export default function App() {
             </button>
           </div>
 
+          {mode !== "photo" && <>
+            <StoryRecipes onSelect={id => {
+              const recipe = recipes.find(r => r.id === id)!;
+              setCreation({ ...creation, recipeId: id,
+                anchors: recipe.colors.map((hex, i) => createAnchor(hex, i, recipe.colors.length)) });
+              setMode("baseColor");
+              setNotice(`${recipe.name} 레시피를 입력색 초안으로 불러왔습니다.`);
+            }} />
+            <StudioSettings value={creation} onChange={next => { setCreation(next); setHarmony(next.harmony); }} />
+          </>}
+
           {mode === "concept" && (
             <div className="input-panel">
               <div className="field-block">
@@ -799,8 +811,7 @@ export default function App() {
                 <span className="field-kicker">02 — FEELING</span>
                 <h3>어떤 분위기를 찾나요?</h3>
                 <p className="field-help">
-                  최대 세 개까지 선택할 수 있습니다. 첫 번째 태그가 색의 방향을
-                  이끕니다.
+                  최대 세 개까지 선택할 수 있습니다. 선택한 분위기를 함께 반영합니다.
                 </p>
                 <div className="choice-wrap">
                   {moodOptions.map((option) => (
@@ -921,25 +932,8 @@ export default function App() {
               </div>
               <div className="base-fields">
                 <span className="field-kicker">01 — COLOR</span>
-                <h3>한 가지 색으로 시작하세요.</h3>
-                <div className="base-input-row">
-                  <label htmlFor="base-hex">기준색 HEX</label>
-                  <input
-                    id="base-hex"
-                    value={baseHex}
-                    onChange={(event) => setBaseHex(event.target.value)}
-                    placeholder="#466C9B"
-                    maxLength={7}
-                  />
-                  <input
-                    type="color"
-                    aria-label="기준색 선택기"
-                    value={normalizeHex(baseHex) ?? "#466C9B"}
-                    onChange={(event) =>
-                      setBaseHex(event.target.value.toUpperCase())
-                    }
-                  />
-                </div>
+                <h3>하나 이상의 색으로 시작하세요.</h3>
+                <SeedFields value={creation} onChange={setCreation} />
                 <p className="field-help">
                   입력한 기준색은 팔레트에 정확히 남고 처음에는 잠깁니다.
                 </p>
@@ -954,7 +948,7 @@ export default function App() {
                       type="button"
                       className={harmony === option.id ? "selected" : ""}
                       aria-pressed={harmony === option.id}
-                      onClick={() => setHarmony(option.id)}
+                      onClick={() => { setHarmony(option.id); setCreation({ ...creation, harmony: option.id }); }}
                     >
                       <strong>{option.name}</strong>
                       <small>{option.detail}</small>
@@ -1018,7 +1012,7 @@ export default function App() {
             <div className="section-heading studio-heading">
               <div>
                 <span className="section-index">02 / REFINE</span>
-                <h2 id="studio-title">나만의 팔레트 스튜디오</h2>
+                <h2 id="studio-title" tabIndex={-1}>나만의 팔레트 스튜디오</h2>
                 <p>
                   {projectTitle(project)} · 원본색과 역할색을 따로 다듬을 수
                   있습니다.
@@ -1029,7 +1023,11 @@ export default function App() {
               </div>
             </div>
 
-            {candidates.length > 0 && (
+            <RefinementPanel project={project}
+              onProject={next => { setProject(next); setSelectedCandidate(-1); setCandidates([]); setCandidateStudio(null); }}
+              onCandidates={(colors, studio) => { setCandidates(colors); setCandidateStudio(studio ?? null); setSelectedCandidate(-1); }} onError={setNotice} />
+
+            {(
               <div className="candidates-section">
                 <div className="subheading">
                   <h3>세 가지 제안</h3>
@@ -1055,28 +1053,23 @@ export default function App() {
                         </span>
                       </span>
                       <strong className="candidate-name">
-                        {candidateStyles[index].name}
+                        {["원색의 관계", "명도 위계", "강조의 균형"][index]}
                       </strong>
                       <span className="candidate-detail">
-                        {candidateStyles[index].detail}
+                        {["입력색의 관계와 의도를 유지", "밝기 차이로 쓰임을 구분", "주변 채도를 절제한 강조"][index]}
                       </span>
                       <span className="candidate-swatches">
                         {colors.map((hex, colorIndex) => (
                           <i
                             key={colorIndex}
                             style={{
-                              background: project.swatches.find(
-                                (swatch) => swatch.id === `s${colorIndex + 1}`,
-                              )?.locked
-                                ? project.swatches.find(
-                                    (swatch) =>
-                                      swatch.id === `s${colorIndex + 1}`,
-                                  )!.hex
-                                : hex,
+                              background: hex,
                             }}
                           />
                         ))}
                       </span>
+                      {candidateRecommendations[index]?.warnings.map(w =>
+                        <span key={w} className="candidate-warning">⚠ {w}</span>)}
                     </button>
                   ))}
                 </div>
@@ -1090,7 +1083,7 @@ export default function App() {
               <div className="palette-column">
                 <div className="subheading">
                   <h3>원본 팔레트</h3>
-                  <span>5 COLORS</span>
+                  <span>{project.swatches.length} COLORS</span>
                 </div>
                 <p className="panel-intro">
                   잠긴 색은 후보를 바꾸거나 대비 수정안을 적용해도 변하지
@@ -1161,6 +1154,12 @@ export default function App() {
               </div>
             </div>
 
+            <div className="current-constraints" aria-live="polite">{paletteWarnings(project.studio,
+              [...project.swatches].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1))).map(c => c.hex))
+              .map(w => <p className="constraint-warning" key={w}>현재 팔레트 · ⚠ {w}</p>)}</div>
+            <ColorAnalysis project={project} onProject={next => { setProject(next); setCandidates([]); setSelectedCandidate(-1); setCandidateStudio(null); }} onError={setNotice} />
+            <ContextScenes project={project} onProject={next => { setProject(next); setSelectedCandidate(-1); setCandidates([]); setCandidateStudio(null); }} />
+
             <div className="roles-section">
               <div className="section-heading compact">
                 <div>
@@ -1230,7 +1229,7 @@ export default function App() {
                     return (
                       <div
                         className={`contrast-card ${passes ? "passes" : "fails"}`}
-                        key={`${activeSet}-${pair.foreground}`}
+                        key={`${activeSet}-${pair.foreground}-${pair.background}`}
                       >
                         <div className="contrast-card-head">
                           <span>
@@ -1252,6 +1251,9 @@ export default function App() {
                           <strong>{ratio.toFixed(2)}:1</strong>
                           <span>목표 {pair.minimum}:1</span>
                         </div>
+                        <small>{pair.kind} · {pair.kind === "일반 텍스트"
+                          ? `AA ${ratio >= 4.5 ? "통과" : "미달"} / AAA ${ratio >= 7 ? "통과" : "미달"}`
+                          : `기준 ${pair.minimum}:1`}</small>
                         {suggested && (
                           <div className="contrast-suggestion">
                             <span>
@@ -1374,13 +1376,12 @@ export default function App() {
               </div>
             </div>
             <div className="export-card planned">
-              <span className="export-card-number">03 / COMING NEXT</span>
-              <h3>프로그램별 파일</h3>
+              <span className="export-card-number">03 / FORMATS</span>
+              <h3>프로그램별 색 파일</h3>
               <p>
-                PowerPoint · VS Code · JetBrains · Vim · iTerm2 · Windows
-                Terminal · PuTTY
+                아래에서 Office 색 구성 · VS Code · Windows Terminal 파일을 받으세요.
               </p>
-              <span className="planned-badge">실제 가져오기 검증 후 제공</span>
+              <span className="planned-badge">구조 검증 · 실제 프로그램 가져오기 별도 확인</span>
             </div>
             <div className="export-card planned">
               <span className="export-card-number">04 / PHOTO</span>
@@ -1392,6 +1393,7 @@ export default function App() {
               <span className="planned-badge">준비 중</span>
             </div>
           </div>
+          <ExtendedExports project={project} onError={setNotice} />
           <p className="storage-note">
             이 기기의 브라우저 데이터를 지우면 프로젝트도 사라질 수 있습니다.
             중요한 팔레트는 JSON으로 백업해 주세요.
@@ -1405,6 +1407,7 @@ export default function App() {
       </footer>
       <div className="live-notice" role="status" aria-live="polite">
         {notice}
+        {notice && <button type="button" aria-label="알림 닫기" onClick={() => setNotice("")}>×</button>}
       </div>
     </div>
   );

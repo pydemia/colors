@@ -68,7 +68,7 @@ export function tone(
   const source = colorParts(hex);
   return oklchHex(
     lightness,
-    chroma ?? Math.max(0.04, source.c),
+    chroma ?? source.c,
     source.h + hueOffset,
   );
 }
@@ -102,8 +102,10 @@ const chromaValue: Record<Saturation, number> = {
 };
 
 export function conceptSeed(input: ConceptInput): string {
+  const x = input.moods.reduce((sum, m) => sum + Math.cos(moodHue[m] * Math.PI / 180), 0);
+  const y = input.moods.reduce((sum, m) => sum + Math.sin(moodHue[m] * Math.PI / 180), 0);
   let hue = input.moods.length
-    ? moodHue[input.moods[0]]
+    ? wrapHue(Math.atan2(y, x) * 180 / Math.PI)
     : directionHue[input.hueDirection];
   if (input.hueDirection === "warm" && hue > 95 && hue < 315) hue = 32;
   if (input.hueDirection === "cool" && (hue < 110 || hue > 305)) hue = 218;
