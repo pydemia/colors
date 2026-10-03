@@ -8,7 +8,7 @@
 - 최종 소스 `pnpm test`: 4개 파일, 27개 통과.
 - `pnpm test:e2e`: Chromium 데스크톱 + iPhone 13 WebKit 각각 8개, 총 16개 통과.
 - `pnpm build`: TypeScript와 Vite 빌드 통과. JS 약 361kB, gzip 약 114kB.
-- `git diff --check` 통과. Node 24.21.0, 실행 pnpm 11.19.0; 프로젝트의 지정 pnpm은 10.34.5.
+- 소스/테스트/README/package의 `git diff 60f06e3 HEAD --check` 통과. 원본 검토 Markdown의 두 공백 줄바꿈과 원문 말미 빈 줄은 유지했다. Node 24.21.0, 실행 pnpm 11.19.0; 프로젝트의 지정 pnpm은 10.34.5.
 - 실제 in-app 브라우저에서 두 입력색/고정·유연 추천/원색 차이 표시와 데스크톱 레이아웃을 확인했다.
 - 한 번의 모바일 다운로드 테스트 실패는 실행 중 App 훅 수정으로 HMR이 프로젝트
   상태를 초기화한 실행이었다. 수정 중인 실행을 통과로 세지 않았고 소스 고정 후 전체 16개를 다시 통과했다.
@@ -27,7 +27,7 @@
 | R13/R15 | scene 자체 필수 데이터/정규화/복원·중복ID, schema1 이행/삭제백업, 즉시 저장 후 reload E2E 통과 |
 | R14 | DTCG/CSS/Tailwind 색값, ASE 독립 decoder, Office XML DOMParser 12색, 대상 JSON 키, SVG/CSV/sequence CSS, float 33³ LUT 순서/identity 검사 통과 |
 | R16 | 고유 ID별 접근 이름, 생성 후 heading focus, 키보드/좁은 폭 overflow E2E 통과; 모바일 캡처 검수 |
-| R17 | 독립 설계/구현 리뷰와 수정 판정 완료. 프로덕션 관측은 아래에 배포 후 기록 |
+| R17 | 독립 설계/구현 리뷰·한정 재검증·수정 판정 완료, 프로덕션 배포와 핵심 6개 테스트 통과 |
 
 ## 출력 계약과 검증의 한계
 
@@ -39,8 +39,24 @@ LUT는 full RGB encoded sRGB D65 창작 룩이며 33³, red-fastest 순서다.
 
 ## 프로덕션
 
-새 배포 관측 전. 소스 commit, Vercel deployment/상태, 도메인 asset,
-실제 고정/유연 후보·재열기·JSON/CSV 흐름을 배포 완료 후 기록한다.
+- 릴리스 소스 commit: `0cdbc2e096908f4eec17ac560c3a5967453401c6`, main push 완료.
+- Vercel Git production: `dpl_9Xf21f9JMGMAQqNfVd3QqPFsAiEg`, READY, aliasError=null.
+- 배포 주소: https://colors-kz6j9tntw-pydemia-7822.vercel.app
+- 실제 도메인: https://colors.pydemia.ai, alias가 위 배포에 연결됨을 API로 확인.
+- 도메인 HTML의 `/assets/index-DnDvdOQm.js`가 최종 로컬 빌드와 일치.
+- 실제 브라우저: #336699 고정 + #E05566 유연으로 생성. 후보2 채택 시 유연색
+  #E16E7B (화면 ΔEOK 0.0497), 재추천 생성만으로 이 값이 바뀌지 않았고 선택 표시가 해제됨.
+- LAB D50, cyclic, linear RGB average, s1의 t=0.3, 장면1 저장 후 reload/재열기에서
+  고정색·유연색·모델·위치·장면을 복원함. 실제 모바일 body/viewport 폭 모두375로 overflow 없음.
+- 실제 도메인을 baseURL로 Chromium/WebKit에서 3개 핵심 흐름을 각각 실행해 6개 통과:
+  다중 고정/유연·의도적 채택·JSON 내용/복원, 위치 충돌 출력 차단·Office XML12색,
+  현재 회피색 경고·시안 focus·잘못된 장면 import 차단.
+- in-app 브라우저의 다운로드 이벤트 대기는 도구 시간 제한에 걸려 통과로 세지 않았다.
+  이후 실제 도메인 자동 브라우저 검증에서 다운로드 파일의 JSON/Office 내용을 직접 확인했다.
+- in-app 브라우저 프로덕션 console error/warn 관측 없음.
+- 캡처: screenshots/production-v0.2.0-desktop.jpg, screenshots/production-v0.2.0-mobile.jpg.
+- 생산 테스트 재현: COLORS_TEST_BASE_URL=https://colors.pydemia.ai를 설정하고
+  `pnpm exec playwright test --grep 'multiple fixed|recipe, off-grid|current avoidance'` 실행.
 
 ## 복구
 

@@ -3,10 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: process.env.COLORS_TEST_BASE_URL ?? "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
-  webServer: {
+  webServer: process.env.COLORS_TEST_BASE_URL ? undefined : {
     command: "pnpm dev --port 4173",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,

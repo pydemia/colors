@@ -20,6 +20,7 @@ pnpm test:e2e
 ```
 
 브라우저 테스트를 처음 실행할 때는 `pnpm exec playwright install chromium webkit`으로 테스트 브라우저를 설치합니다.
+`COLORS_TEST_BASE_URL`을 지정하면 로컬 서버를 시작하지 않고 해당 배포에서 같은 테스트를 실행합니다.
 
 ## 기능
 
