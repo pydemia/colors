@@ -1,8 +1,123 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { contrastRatio } from "../src/lib/color";
 import { parseColor } from "../src/lib/studio";
+
+const imageColors = ["#234D4A", "#E2A46D", "#336699", "#F2E9DA", "#943D52"];
+
+async function imageFixture(page: Page, transparent = false) {
+  const base64 = await page.evaluate(({ colors, transparent }) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 250;
+    canvas.height = 100;
+    const context = canvas.getContext("2d")!;
+    if (!transparent) colors.forEach((color, index) => {
+      context.fillStyle = color;
+      context.fillRect(index * 50, 0, 50, 100);
+    });
+    return canvas.toDataURL("image/png").split(",")[1];
+  }, { colors: imageColors, transparent });
+  return { name: transparent ? "transparent.png" : "color-study.png",
+    mimeType: "image/png", buffer: Buffer.from(base64, "base64") };
+}
+
+test("photo upload, fixed and flexible colors, exports and saved restoration", async ({ page }, testInfo) => {
+  await page.goto("/#photo");
+  const transmissions: string[] = [];
+  page.on("request", request => {
+    if (["POST", "PUT", "PATCH"].includes(request.method()))
+      transmissions.push(request.url());
+  });
+  await page.getByLabel("사진 또는 이미지 파일").setInputFiles(await imageFixture(page));
+  await expect(page.locator(".image-colors li")).toHaveCount(5);
+  for (const hex of imageColors) await expect(page.locator(".image-colors")).toContainText(hex);
+  await expect(page.locator(".photo-status")).toContainText("250 × 100");
+  await page.getByLabel("추출할 대표색", { exact: true }).selectOption("3");
+  await page.getByRole("button", { name: "대표색 다시 추출", exact: true }).click();
+  await expect(page.locator(".image-colors li")).toHaveCount(3);
+  await page.getByLabel("추출할 대표색", { exact: true }).selectOption("5");
+  await page.getByRole("button", { name: "대표색 다시 추출", exact: true }).click();
+  const original = await page.getByLabel("1번째 입력색", { exact: true }).inputValue();
+  const flexible = await page.getByLabel("2번째 입력색", { exact: true }).inputValue();
+  await page.getByLabel("색 고정 2", { exact: true }).uncheck();
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", await page.evaluate(() => document.body.clientWidth));
+  await page.locator(".photo-result").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("image-extraction.png") });
+  await page.getByRole("button", { name: /이미지 색으로 후보 만들기/ }).click();
+  await expect(page.locator(".candidate-card")).toHaveCount(3);
+  await expect(page.getByLabel("1번째 원본색 HEX")).toHaveValue(original);
+  await expect(page.getByLabel("1번째 원본색 HEX")).toBeDisabled();
+  await page.locator(".candidate-card").nth(1).click();
+  await expect(page.getByLabel("1번째 원본색 HEX")).toHaveValue(original);
+  const jsonPending = page.waitForEvent("download");
+  await page.getByRole("button", { name: "JSON 백업 ↓" }).click();
+  const jsonFile = await jsonPending;
+  const bytes = await readFile(await jsonFile.path(), "utf8");
+  const data = JSON.parse(bytes);
+  expect(data.source).toMatchObject({ kind: "photo", image: {
+    acquisition: "upload", filename: "color-study.png",
+  } });
+  expect(data.studio.anchors[1]).toMatchObject({ originalHex: flexible, locked: false });
+  expect(data.swatches[0]).toMatchObject({ hex: original, origin: "autoExtracted" });
+  expect(data.swatches[0].imageSourceId).toBe(data.source.image.id);
+  expect(bytes).not.toMatch(/data:image|blob:|base64|pixels/);
+  const cssPending = page.waitForEvent("download");
+  await page.getByRole("button", { name: "CSS 받기 ↓" }).click();
+  const cssFile = await cssPending;
+  expect(await readFile(await cssFile.path(), "utf8")).toContain(`--colors-palette-s1: ${original};`);
+  await page.reload();
+  await expect(page.getByAltText("색을 추출한 원본 이미지")).toHaveCount(0);
+  await page.getByRole("button", { name: /내 프로젝트/ }).click();
+  await page.getByRole("button", { name: /사진에서 시작한 팔레트/ }).first().click();
+  await expect(page.getByLabel("1번째 원본색 HEX")).toHaveValue(original);
+  page.once("dialog", dialog => dialog.accept());
+  await page.locator('input[type=file][accept*="json"]').setInputFiles({
+    name: "photo-project.json", mimeType: "application/json", buffer: Buffer.from(bytes),
+  });
+  await expect(page.getByRole("status")).toContainText("프로젝트를 가져왔습니다");
+  expect(transmissions).toEqual([]);
+});
+
+test("image paste and drop events, validation and recovery", async ({ page }) => {
+  await page.goto("/#photo");
+  const fixture = await imageFixture(page);
+  const dispatchImage = async (kind: "paste" | "drop", base64: string, name = "color-study.png") => {
+    await page.locator(".photo-workspace").evaluate((element, { kind, base64, name }) => {
+      const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+      const data = new DataTransfer();
+      data.items.add(new File([bytes], name, { type: "image/png" }));
+      const event = kind === "paste"
+        ? new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data })
+        : new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data });
+      element.dispatchEvent(event);
+    }, { kind, base64, name });
+  };
+  await dispatchImage("paste", fixture.buffer.toString("base64"));
+  await expect(page.locator(".photo-status")).toContainText("붙여넣은 이미지");
+  await expect(page.locator(".image-colors li")).toHaveCount(5);
+  await page.getByRole("button", { name: /이미지 색으로 후보 만들기/ }).click();
+  const pending = page.waitForEvent("download");
+  await page.getByRole("button", { name: "JSON 백업 ↓" }).click();
+  const file = await pending;
+  expect(JSON.parse(await readFile(await file.path(), "utf8")).source.image.acquisition).toBe("clipboard");
+  await page.getByRole("button", { name: /사진·이미지/ }).click();
+  await dispatchImage("drop", fixture.buffer.toString("base64"), "dropped.png");
+  await expect(page.locator(".photo-status")).toContainText("dropped.png");
+  const input = page.getByLabel("사진 또는 이미지 파일");
+  await input.setInputFiles({ name: "bad.png", mimeType: "image/png", buffer: Buffer.from("broken") });
+  await expect(page.getByRole("alert")).toContainText("이미지를 읽지 못했습니다");
+  await expect(page.locator(".photo-status")).toContainText("dropped.png");
+  await input.setInputFiles(await imageFixture(page, true));
+  await expect(page.getByRole("alert")).toContainText("투명 이미지");
+  await input.setInputFiles({ name: "vector.svg", mimeType: "image/svg+xml", buffer: Buffer.from("<svg/>") });
+  await expect(page.getByRole("alert")).toContainText("SVG");
+  await input.setInputFiles(fixture);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "이미지 제거", exact: true }).click();
+  await expect(page.getByAltText("색을 추출한 원본 이미지")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /이미지 색으로 후보 만들기/ })).toHaveCount(0);
+});
 
 test("export center downloads current CSS and native program files", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
@@ -271,17 +386,10 @@ test("base color remains locked through a new candidate and saved project surviv
   await expect(page.getByLabel("1번째 원본색 HEX")).toHaveValue("#336699");
 });
 
-test("photo functions are visibly pending and invalid input has feedback", async ({
+test("invalid seed input has feedback", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /사진 준비 중/ }).click();
-  await expect(
-    page.getByRole("button", { name: /사진 업로드 · 준비 중/ }),
-  ).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: /사진 다운로드 · 준비 중/ }),
-  ).toBeDisabled();
   await page
     .getByRole("button", { name: /기준색/ })
     .first()

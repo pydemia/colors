@@ -35,6 +35,7 @@ import {
 import { createAnchor, defaultStudio, parseColor, recommend, validateStudio, paletteWarnings, type Studio } from "./lib/studio";
 import { recipes } from "./lib/recipes";
 import { ExtendedExports } from "./components/ExportPanel";
+import { PhotoPanel } from "./components/PhotoPanel";
 import { ColorAnalysis, ContextScenes, RefinementPanel,
   SeedFields, StoryRecipes, StudioSettings } from "./components/StudioPanels";
 import "./styles.css";
@@ -356,7 +357,8 @@ function RoleRow({
 }
 
 export default function App() {
-  const [mode, setMode] = useState<StartMode>("concept");
+  const [mode, setMode] = useState<StartMode>(() =>
+    window.location.hash === "#photo" ? "photo" : "concept");
   const [creation, setCreation] = useState(() => defaultStudio([createAnchor("#466C9B", 0)], defaultConcept));
   const baseHex = creation.anchors[0]?.originalHex ?? "#466C9B";
   const [harmony, setHarmony] = useState<Harmony>("analogous");
@@ -426,12 +428,15 @@ export default function App() {
     }
   }
 
-  function generate(): void {
+  function generate(photoSource?: Extract<Source, { kind: "photo" }>): void {
     try {
       let source: Source;
       let selectedHarmony: Harmony;
-      if (mode === "photo") return;
-      if (mode === "baseColor") {
+      if (mode === "photo") {
+        if (!photoSource) throw new Error("먼저 이미지를 추가해 주세요.");
+        source = photoSource;
+        selectedHarmony = creation.harmony;
+      } else if (mode === "baseColor") {
         const valid = parseColor(baseHex);
         if (!valid) throw new Error("1번째 입력색의 형식이 잘못되었습니다. 불투명 HEX/RGB/HSL/OKLCH 색을 입력하세요.");
         source = { kind: "baseColor", hex: valid, harmony: creation.harmony, generationIndex: 0 };
@@ -447,7 +452,7 @@ export default function App() {
         source = { kind: "concept", ...nextConcept, generationIndex: 0 };
         selectedHarmony = creation.harmony;
       }
-      const anchors = mode === "baseColor" ? creation.anchors.map((a, i) => {
+      const anchors = mode !== "concept" ? creation.anchors.map((a, i) => {
         const hex = parseColor(a.originalHex);
         if (!hex) throw new Error(`${i + 1}번째 입력색의 형식이 잘못되었습니다.`);
         return { ...a, originalHex: hex };
@@ -599,9 +604,7 @@ export default function App() {
           <a href="#export" className={!project ? "nav-muted" : ""}>
             내보내기
           </a>
-          <span className="nav-coming">
-            사진 <small>준비 중</small>
-          </span>
+          <a href="#photo" onClick={() => setMode("photo")}>이미지로 만들기</a>
         </nav>
         <span className="header-edition">COLOR STUDIO / 01</span>
       </header>
@@ -698,7 +701,7 @@ export default function App() {
               <em>쓰임</em>까지 생각합니다<span className="hero-stop">.</span>
             </h1>
             <p>
-                콘셉트와 하나 이상의 색에서 출발해, 실제 화면에 어울리는 팔레트로
+                콘셉트·사진·하나 이상의 색에서 출발해, 실제 화면에 어울리는 팔레트로
               완성하세요. 색마다 역할을 정하고 바로 비교할 수 있습니다.
             </p>
             <div className="hero-note">
@@ -767,7 +770,7 @@ export default function App() {
               className={mode === "photo" ? "active" : ""}
               onClick={() => setMode("photo")}
             >
-              <span>03</span> 사진 <small>준비 중</small>
+              <span>03</span> 사진·이미지 <b>↗</b>
             </button>
           </div>
 
@@ -915,7 +918,7 @@ export default function App() {
               <button
                 type="button"
                 className="primary-action"
-                onClick={generate}
+                onClick={() => generate()}
               >
                 콘셉트로 후보 만들기 <span>↗</span>
               </button>
@@ -959,7 +962,7 @@ export default function App() {
                 <button
                   type="button"
                   className="primary-action"
-                  onClick={generate}
+                  onClick={() => generate()}
                 >
                   기준색으로 후보 만들기 <span>↗</span>
                 </button>
@@ -967,41 +970,14 @@ export default function App() {
             </div>
           )}
 
-          {mode === "photo" && (
-            <div className="photo-panel">
-              <div className="photo-graphic" aria-hidden="true">
-                <div>
-                  PHOTO
-                  <br />
-                  TO
-                  <br />
-                  PALETTE<span>✳</span>
-                </div>
-              </div>
-              <div>
-                <span className="field-kicker">COMING NEXT</span>
-                <h3>
-                  사진에서 색을 고르는 일,
-                  <br />곧 이곳에서 할 수 있어요.
-                </h3>
-                <p>
-                  사진 업로드·검색·추출·사진 파일 다운로드는 다음 단계에서
-                  제공합니다. 지금은 콘셉트나 기준색으로 팔레트를 만들어 보세요.
-                </p>
-                <div className="disabled-menu">
-                  <button type="button" disabled>
-                    사진 업로드 · 준비 중
-                  </button>
-                  <button type="button" disabled>
-                    사진 검색 · 준비 중
-                  </button>
-                  <button type="button" disabled>
-                    사진 다운로드 · 준비 중
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <div id="photo" hidden={mode !== "photo"}>
+            <PhotoPanel value={creation} onChange={setCreation}
+              onColors={colors => setCreation(current => ({ ...current,
+                anchors: colors.map((color, index) =>
+                  createAnchor(color.hex, index, colors.length)),
+                count: Math.max(current.count, colors.length), recipeId: null,
+              }))} onGenerate={generate} />
+          </div>
         </section>
 
         {project && (
@@ -1384,14 +1360,14 @@ export default function App() {
               </p>
               <span className="planned-badge">현재 팔레트와 역할색으로 생성</span>
             </div>
-            <div className="export-card planned">
+            <div className="export-card available">
               <span className="export-card-number">04 / PHOTO</span>
-              <h3>사진 기능</h3>
+              <h3>이미지에서 색 추출</h3>
               <p>
-                사진 업로드·검색·추출·사진 파일 다운로드와 파일 저장소는 다음
-                단계에 준비합니다.
+                파일 선택·드래그 앤 드롭·이미지 붙여넣기로 대표색을 추출합니다.
+                추출색도 같은 형식으로 내려받을 수 있습니다.
               </p>
-              <span className="planned-badge">준비 중</span>
+              <a href="#photo" onClick={() => setMode("photo")}>이미지로 시작하기 ↗</a>
             </div>
           </div>
           <ExtendedExports project={project} onError={setNotice} />

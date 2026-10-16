@@ -566,55 +566,82 @@ a {
   font-size: 10px;
   margin-top: 3px;
 }
-.photo-panel {
-  display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: 50px;
-  align-items: center;
-  padding: 38px;
+#photo { scroll-margin-top: 100px; }
+.photo-workspace {
+  padding: 32px;
   background: #f5f6f1;
-  border: 1px solid #e4e7df;
+  border: 2px dashed #bcc7bf;
 }
-.photo-graphic {
-  min-height: 330px;
-  background: #273e42;
-  display: grid;
-  place-items: center;
-  color: #d6e1d7;
+.photo-workspace.is-dragging {
+  border-color: #234d4a;
+  background: #e2eeea;
 }
-.photo-graphic div {
-  font-family: Georgia, serif;
-  font-size: 55px;
-  line-height: 0.98;
-  letter-spacing: -3px;
-}
-.photo-graphic span {
-  color: #e7ab76;
-  font-size: 40px;
-  margin-left: 20px;
-}
-.photo-panel h3 {
-  font-size: 28px;
-  line-height: 1.5;
-}
-.photo-panel p {
-  line-height: 1.9;
-  color: #74847b;
-  font-size: 14px;
-}
-.disabled-menu {
+.photo-input-head,
+.photo-input-actions,
+.photo-extract-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 25px;
+  gap: 12px;
 }
-.disabled-menu button {
-  padding: 10px;
-  border: 1px solid #dbe1d8;
+.photo-input-head { justify-content: space-between; gap: 24px; }
+.photo-input-head h3 { font-size: 25px; margin: 8px 0; }
+.photo-input-head p,
+.photo-privacy { line-height: 1.8; font-size: 14px; }
+.photo-workspace button:not(.primary-action):not(.light-pad) {
+  min-height: 44px;
+}
+.photo-input-actions button,
+.photo-extract-actions button,
+.photo-extraction > button {
+  border: 1px solid #87988c;
   background: #fff;
-  color: #69776d;
-  font-size: 11px;
+  padding: 10px 15px;
+  color: #234d4a;
 }
+.photo-paste-target:focus-visible { outline-offset: 4px; }
+.photo-privacy { color: #41584b; margin: 12px 0; }
+.photo-workspace .field-help { color: #596d60; }
+.photo-status { overflow-wrap: anywhere; font-size: 13px; }
+.photo-error { color: #9f2631; line-height: 1.7; }
+.photo-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 30px;
+  padding: 24px 0;
+  margin-top: 24px;
+  border-top: 1px solid #c8d1c9;
+}
+.photo-preview { margin: 0; min-width: 0; }
+.photo-preview img {
+  display: block;
+  width: 100%;
+  max-height: 390px;
+  object-fit: contain;
+  background: repeating-conic-gradient(#dde3dc 0% 25%, #fff 0% 50%) 0 / 20px 20px;
+}
+.photo-preview figcaption {
+  margin-top: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.photo-extract-actions label { display: grid; gap: 7px; font-size: 13px; }
+.photo-extract-actions select { min-height: 44px; padding: 8px 12px; }
+.image-colors { list-style: none; margin: 22px 0; padding: 0; }
+.image-colors li {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.image-colors i { height: 30px; border: 1px solid #1d392622; }
+.image-colors span { font-variant-numeric: tabular-nums; }
+.photo-generation { border: 0; margin: 20px 0 0; padding: 0; min-width: 0; }
+.photo-generation > legend { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+.photo-generation .studio-settings { margin-top: 28px; }
+.photo-generation > .primary-action { margin-top: 24px; }
 .studio-section {
   scroll-margin-top: 30px;
 }
@@ -1568,22 +1595,20 @@ a {
     font-size: 8px;
   }
   .input-panel,
-  .photo-panel {
+  .photo-workspace {
     padding: 22px;
   }
   .field-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .base-panel,
-  .photo-panel {
+  .photo-result {
     grid-template-columns: 1fr;
   }
   .base-color-showcase {
     min-height: 160px;
   }
-  .photo-graphic {
-    min-height: 220px;
-  }
+  .photo-input-head h3 { font-size: 22px; }
   .candidate-grid {
     grid-template-columns: 1fr;
     gap: 9px;

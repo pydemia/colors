@@ -25,7 +25,7 @@ export type Source =
       kind: "photo";
       image: {
         id: string;
-        acquisition: "upload" | "search";
+        acquisition: "upload" | "clipboard" | "search";
         filename?: string | null;
         provider?: string | null;
         photographer?: string | null;
@@ -331,7 +331,10 @@ export function createProject(source: Source, colors: string[], config?: Studio)
   const swatches: Swatch[] = colors.map((hex, index) => ({
     id: `s${index + 1}`,
     hex: normalizeHex(hex)!,
-    origin: studio.anchors.some(a => a.id === `s${index + 1}`) ? "input" : "generated",
+    origin: studio.anchors.some(a => a.id === `s${index + 1}`)
+      ? source.kind === "photo" ? "autoExtracted" : "input" : "generated",
+    ...(source.kind === "photo" && studio.anchors.some(a => a.id === `s${index + 1}`)
+      ? { imageSourceId: source.image.id } : {}),
     locked: studio.anchors.find(a => a.id === `s${index + 1}`)?.locked ?? false,
   }));
   return {
@@ -373,10 +376,8 @@ export function regenerate(project: Project): {
   project: Project;
   candidates: string[][];
 } {
-  if (project.source.kind === "photo")
-    throw new Error("사진 추출은 준비 중입니다.");
-  const generationIndex = project.source.generationIndex + 1;
-  const source = { ...project.source, generationIndex };
+  const source = project.source.kind === "photo" ? project.source :
+    { ...project.source, generationIndex: project.source.generationIndex + 1 };
   const studio = { ...project.studio, generation: project.studio.generation + 1 };
   const candidates = recommend(studio).map(c => c.colors);
   return {
@@ -615,7 +616,7 @@ export function parseProject(json: string): Project {
     if (
       !isRecord(image) ||
       typeof image.id !== "string" ||
-      !["upload", "search"].includes(String(image.acquisition))
+      !["upload", "clipboard", "search"].includes(String(image.acquisition))
     ) {
       throw new Error("사진 출처 데이터가 잘못되었습니다.");
     }
