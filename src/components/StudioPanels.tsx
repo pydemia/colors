@@ -11,10 +11,6 @@ import {
   chooseCandidate, getRoleHex, setSwatchHex,
   type Project,
 } from "../lib/project";
-import {
-  exportAse, exportColormap, exportCube, exportOffice, exportSequence,
-  exportSvg, exportTailwind, exportTerminal, exportTokens, exportVsCode,
-} from "../lib/exports";
 
 type SettingsProps = { value: Studio; onChange: (studio: Studio) => void };
 function SelectField({ label, value, options, onChange }: {
@@ -251,40 +247,6 @@ export function ColorAnalysis({ project, onProject, onError }: {
     <div aria-live="polite" className="constraint-feedback">{[...new Set([...mapWarnings, ...recommendationWarnings])].map(w =>
       <p key={w} className="constraint-warning">⚠ {w}</p>)}{!mapWarnings.length && <p>✓ 검사한 위치·명도 조건 통과. 순차/발산형은 257 표본에서 L 역전 허용오차 0.006으로 확인합니다.</p>}</div>
   </details>;
-}
-
-export function ExtendedExports({ project, onError }: { project: Project | null; onError: (m: string) => void }) {
-  const [format, setFormat] = useState("tokens");
-  const formats: Record<string, { name: string; file: string; type: string; output: (p: Project) => string | Uint8Array<ArrayBuffer> }> = {
-    tokens: { name: "DTCG 2025.10 토큰 JSON", file: "colors.tokens.json", type: "application/json", output: exportTokens },
-    tailwind4: { name: "Tailwind 4 @theme", file: "colors.tailwind.css", type: "text/css", output: p => exportTailwind(p, 4) },
-    tailwind3: { name: "Tailwind 3 config", file: "colors.tailwind.cjs", type: "text/javascript", output: p => exportTailwind(p, 3) },
-    svg: { name: "SVG 색표", file: "colors.svg", type: "image/svg+xml", output: exportSvg },
-    ase: { name: "Adobe ASE 색표", file: "colors.ase", type: "application/octet-stream", output: exportAse },
-    office: { name: "Office 색 구성 XML", file: "colors.clrScheme.xml", type: "application/xml", output: exportOffice },
-    vscode: { name: "VS Code 색 테마 JSON", file: "colors-vscode.json", type: "application/json", output: exportVsCode },
-    terminal: { name: "Windows Terminal 색 구성 JSON", file: "colors-terminal.json", type: "application/json", output: exportTerminal },
-    colormap: { name: "colormap CSV · 256 표본 + 앵커", file: "colors-colormap.csv", type: "text/csv", output: exportColormap },
-    cube: { name: "창작용 sRGB 33³ LUT .cube", file: "colors-look.cube", type: "text/plain", output: exportCube },
-    sequence: { name: "시간적 배색 CSS", file: "colors-sequence.css", type: "text/css", output: exportSequence },
-  };
-  const download = () => {
-    if (!project) return;
-    try {
-      const f = formats[format];
-      const output = f.output(project);
-      const url = URL.createObjectURL(new Blob([output], { type: f.type }));
-      const link = document.createElement("a"); link.href = url; link.download = f.file;
-      document.body.append(link); link.click(); link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) { onError(error instanceof Error ? error.message : "출력하지 못했습니다."); }
-  };
-  return <div className="extended-exports"><h3>사용할 도구에 맞춰 가져가세요.</h3>
-    <SelectField label="내보내기 형식" value={format} options={Object.entries(formats).map(([k, f]) => [k, f.name])} onChange={setFormat} />
-    <button className="primary-action" type="button" disabled={!project || (format === "sequence" && !project.sequence.length)}
-      onClick={download}>선택한 형식 받기 ↓</button>
-    <p className="field-help">Office XML은 12색 clrScheme입니다. JSON은 각 도구의 색 테마/색 구성 파일입니다. ASE·Office·영상 도구의 실제 가져오기는 별도 확인이 필요합니다. LUT는 sRGB 화면용 룩이며 카메라 LOG 변환이 아닙니다. 고정색 포함 보장은 팔레트·colormap 출력에 적용합니다.</p>
-  </div>;
 }
 
 export function ContextScenes({ project, onProject }: { project: Project; onProject: (p: Project) => void }) {

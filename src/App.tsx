@@ -34,7 +34,8 @@ import {
 } from "./lib/project";
 import { createAnchor, defaultStudio, parseColor, recommend, validateStudio, paletteWarnings, type Studio } from "./lib/studio";
 import { recipes } from "./lib/recipes";
-import { ColorAnalysis, ContextScenes, ExtendedExports, RefinementPanel,
+import { ExtendedExports } from "./components/ExportPanel";
+import { ColorAnalysis, ContextScenes, RefinementPanel,
   SeedFields, StoryRecipes, StudioSettings } from "./components/StudioPanels";
 import "./styles.css";
 
@@ -1375,13 +1376,13 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <div className="export-card planned">
+            <div className="export-card available">
               <span className="export-card-number">03 / FORMATS</span>
               <h3>프로그램별 색 파일</h3>
               <p>
-                아래에서 Office 색 구성 · VS Code · Windows Terminal 파일을 받으세요.
+                편집기·터미널·Office·디자인 도구에서 사용할 형식을 아래에서 선택하세요.
               </p>
-              <span className="planned-badge">구조 검증 · 실제 프로그램 가져오기 별도 확인</span>
+              <span className="planned-badge">현재 팔레트와 역할색으로 생성</span>
             </div>
             <div className="export-card planned">
               <span className="export-card-number">04 / PHOTO</span>

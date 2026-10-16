@@ -1,10 +1,16 @@
 import { converter } from "culori";
 import { exportCss, getRoleHex, roleKeys, type Project } from "./project";
 import { lookColor, mapStops, sampleMap } from "./studio";
+import { luminance } from "./color";
 
 const rgb = converter("rgb");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const kebab = (name: string) => name.replace(/[A-Z]/g, s => `-${s.toLowerCase()}`);
+const ansiRoles = [
+  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue",
+  "brightMagenta", "brightCyan", "brightWhite",
+] as const;
 
 export function exportTokens(project: Project): string {
   const token = (hex: string) => {
@@ -80,10 +86,122 @@ export function exportTerminal(project: Project): string {
   return json({ name: `Colors-${project.projectId.slice(0, 8)}`,
     background: c("background"), foreground: c("foreground"), cursorColor: c("cursor"),
     selectionBackground: c("selection"),
-    ...Object.fromEntries(["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-      "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue", "brightMagenta",
-      "brightCyan", "brightWhite"].map(role => [role.replace("magenta", "purple")
+    ...Object.fromEntries(ansiRoles.map(role => [role.replace("magenta", "purple")
         .replace("Magenta", "Purple"), c(role)])) });
+}
+
+export function exportVsCodeSettings(project: Project): string {
+  const theme = JSON.parse(exportVsCode(project));
+  return json({
+    "workbench.colorCustomizations": theme.colors,
+    "editor.tokenColorCustomizations": { textMateRules: theme.tokenColors },
+  });
+}
+
+export function exportJetBrains(project: Project): string {
+  const c = (role: string) => getRoleHex(project, "editor", role).slice(1);
+  const parent = luminance(getRoleHex(project, "editor", "background")) < 0.5
+    ? "Darcula" : "Default";
+  const attributes: [string, string][] = [
+    ["DEFAULT_LINE_COMMENT", "comment"], ["DEFAULT_BLOCK_COMMENT", "comment"],
+    ["DEFAULT_DOC_COMMENT", "comment"], ["DEFAULT_KEYWORD", "keyword"],
+    ["DEFAULT_STRING", "string"], ["DEFAULT_NUMBER", "number"],
+    ["DEFAULT_CLASS_NAME", "type"], ["DEFAULT_INTERFACE_NAME", "type"],
+    ["DEFAULT_FUNCTION_DECLARATION", "function"],
+    ["DEFAULT_FUNCTION_CALL", "function"], ["DEFAULT_IDENTIFIER", "variable"],
+    ["DEFAULT_LOCAL_VARIABLE", "variable"], ["DEFAULT_PARAMETER", "variable"],
+  ];
+  const colors: [string, string][] = [
+    ["CARET_COLOR", "foreground"], ["SELECTION_BACKGROUND", "selection"],
+    ["SELECTION_FOREGROUND", "foreground"], ["CONSOLE_BACKGROUND_KEY", "background"],
+  ];
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<scheme name="Colors" version="142" parent_scheme="${parent}">\n` +
+    `  <colors>\n${colors.map(([key, role]) =>
+      `    <option name="${key}" value="${c(role)}" />`).join("\n")}\n  </colors>\n` +
+    `  <attributes>\n    <option name="TEXT"><value>` +
+    `<option name="FOREGROUND" value="${c("foreground")}" />` +
+    `<option name="BACKGROUND" value="${c("background")}" />` +
+    `</value></option>\n` + attributes.map(([key, role]) =>
+      `    <option name="${key}"><value><option name="FOREGROUND" value="${c(role)}" /></value></option>`
+    ).join("\n") + "\n  </attributes>\n</scheme>\n";
+}
+
+/** GUI/true-color Vim colors; cterm uses the nearest fixed xterm-256 color. */
+export function exportVim(project: Project): string {
+  const c = (role: string) => getRoleHex(project, "editor", role);
+  const xterm = Array.from({ length: 240 }, (_, index) => {
+    const i = index + 16;
+    if (i >= 232) return [8 + (i - 232) * 10, 8 + (i - 232) * 10, 8 + (i - 232) * 10];
+    const n = i - 16;
+    const levels = [0, 95, 135, 175, 215, 255];
+    return [levels[Math.floor(n / 36)], levels[Math.floor(n / 6) % 6], levels[n % 6]];
+  });
+  const nearest = (hex: string) => {
+    const value = rgb(hex)!;
+    const channels = [value.r * 255, value.g * 255, value.b * 255];
+    let best = 0;
+    let distance = Infinity;
+    xterm.forEach((candidate, i) => {
+      const delta = candidate.reduce((sum, v, k) => sum + (v - channels[k]) ** 2, 0);
+      if (delta < distance) { best = i; distance = delta; }
+    });
+    return best + 16;
+  };
+  const highlight = (group: string, foreground: string, background?: string) =>
+    `highlight ${group} guifg=${foreground} guibg=${background ?? "NONE"} gui=NONE ` +
+    `ctermfg=${nearest(foreground)} ctermbg=${background ? nearest(background) : "NONE"} cterm=NONE`;
+  return [
+    '" Colors generated color scheme. True color preserves HEX; xterm-256 is approximate.',
+    `set background=${luminance(c("background")) < 0.5 ? "dark" : "light"}`,
+    "highlight clear", 'if exists("syntax_on")', "  syntax reset", "endif",
+    'let g:colors_name = "colors"',
+    highlight("Normal", c("foreground"), c("background")),
+    highlight("Visual", c("foreground"), c("selection")),
+    ...Object.entries({ Comment: "comment", Constant: "number", Number: "number",
+      String: "string", Statement: "keyword", Keyword: "keyword", Type: "type",
+      Function: "function", Identifier: "variable", Error: "error", WarningMsg: "warning" })
+      .map(([group, role]) => highlight(group, c(role))),
+    "",
+  ].join("\n");
+}
+
+export function exportITerm(project: Project): string {
+  const entries = [
+    ...ansiRoles.map((role, i) => [`Ansi ${i} Color`, role]),
+    ["Background Color", "background"], ["Foreground Color", "foreground"],
+    ["Cursor Color", "cursor"], ["Cursor Text Color", "background"],
+    ["Selection Color", "selection"], ["Selected Text Color", "foreground"],
+    ["Bold Color", "brightWhite"],
+  ];
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
+    '<plist version="1.0"><dict>\n' + entries.map(([key, role]) => {
+      const value = rgb(getRoleHex(project, "terminal", role))!;
+      return `  <key>${key}</key><dict><key>Color Space</key><string>sRGB</string>` +
+        "<key>Alpha Component</key><real>1</real>" +
+        ["Red", "Green", "Blue"].map((name, i) =>
+          `<key>${name} Component</key><real>${[value.r, value.g, value.b][i]}</real>`).join("") +
+        "</dict>";
+    }).join("\n") + "\n</dict></plist>\n";
+}
+
+/** Windows .reg uses UTF-16LE with BOM; only the Colors session's colors are set. */
+export function exportPutty(project: Project): Uint8Array<ArrayBuffer> {
+  const colors = ["foreground", "brightWhite", "background", "background",
+    "background", "cursor", ...ansiRoles.slice(0, 8).flatMap((role, i) =>
+      [role, ansiRoles[i + 8]])];
+  const text = ["Windows Registry Editor Version 5.00", "",
+    "[HKEY_CURRENT_USER\\Software\\SimonTatham\\PuTTY\\Sessions\\Colors]",
+    ...colors.map((role, i) => {
+      const value = rgb(getRoleHex(project, "terminal", role))!;
+      return `"Colour${i}"="${[value.r, value.g, value.b].map(v => Math.round(v * 255)).join(",")}"`;
+    }), "", ""].join("\r\n");
+  const bytes = new Uint8Array(new ArrayBuffer(2 + text.length * 2));
+  const view = new DataView(bytes.buffer);
+  view.setUint16(0, 0xfeff, true);
+  for (let i = 0; i < text.length; i++) view.setUint16(2 + i * 2, text.charCodeAt(i), true);
+  return bytes;
 }
 export function exportColormap(project: Project): string {
   const samples = sampleMap(mapStops(project.studio, project.swatches), project.studio);

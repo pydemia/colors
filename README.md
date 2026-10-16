@@ -33,11 +33,18 @@ pnpm test:e2e
 - 웹사이트·화면용 발행물·PowerPoint·코드 편집기·터미널 모사 시안
 - 전경과 배경의 대비 확인 및 사용자가 선택하는 역할색 수정안
 - 최대 5개 장면, 기기 자동 저장과 schema1/2 JSON 가져오기·복원
-- CSS/DTCG 토큰/Tailwind 3·4/SVG/ASE/Office 색 구성 XML/VS Code/Windows Terminal/colormap CSV/33³ LUT 출력
+- CSS/DTCG 토큰/Tailwind 3·4/SVG/ASE/Office 색 구성 XML/VS Code/JetBrains/Vim·Neovim/Windows Terminal/iTerm2/PuTTY/colormap CSV/33³ LUT 출력
+- 내보내기 파일명·내용 미리보기·텍스트 복사·형식별 적용 안내
 
 추천 설정과 새 후보 생성은 초안이며, 후보 카드를 선택할 때 현재 결과에 적용합니다. 출력은 현재 채택된 프로젝트를 사용합니다. 고정색은 정확한 HEX를 유지하고, 유연색은 반복 추천에도 최초 입력색을 기준으로 제한합니다.
 
 프로젝트는 현재 브라우저의 `localStorage`에 저장됩니다. 브라우저 데이터를 지우거나 다른 기기에서 열면 보이지 않으므로 JSON으로 백업할 수 있습니다. JSON과 CSS에는 사진 파일이 포함되지 않습니다.
+
+내보내기 파일은 브라우저에서 생성하며 별도 클라우드 파일 저장소를 사용하지
+않습니다. CSS에는 `--colors-palette-s1` 같은 원본색과 사용처별 역할색이
+함께 들어갑니다. VS Code는 설정 병합용 JSON과 확장 개발용 테마 JSON을
+구분합니다. 적용 방법과 검사 범위는
+[색 파일 다운로드 검증](.worknotes/EXPORT_DOWNLOAD_QA.md)에 기록합니다.
 
 사진 업로드·검색·추출은 `준비 중`입니다. 소재/RYB/감색은 디지털 근사이며 ICC 인쇄·물리적 안료·색온도 측정 기능은 제공하지 않습니다. 프로그램 시안은 모사 화면입니다. Office 출력은 12색 DrawingML 조각이며 `.thmx`가 아닙니다. ASE/Office/영상 도구의 실제 가져오기는 아직 검증하지 않았고, 파일 구조와 색값을 검사했습니다. LUT는 encoded sRGB D65 전체 RGB 룩 변환이며 카메라 LOG용 LUT가 아닙니다.
 

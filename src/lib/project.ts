@@ -528,6 +528,9 @@ function cssName(value: string): string {
 
 export function exportCss(project: Project): string {
   const lines = [":root {"];
+  for (const swatch of project.swatches) {
+    lines.push(`  --colors-palette-${swatch.id}: ${swatch.hex};`);
+  }
   for (const set of Object.keys(roleKeys) as RoleSetName[]) {
     for (const role of roleKeys[set]) {
       lines.push(

@@ -1,6 +1,82 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { contrastRatio } from "../src/lib/color";
+import { parseColor } from "../src/lib/studio";
+
+test("export center downloads current CSS and native program files", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "선택한 형식 받기 ↓" })).toBeDisabled();
+  await page.getByRole("button", { name: /기준색/ }).first().click();
+  await page.getByLabel("1번째 입력색", { exact: true }).fill("#123456");
+  await page.getByRole("button", { name: /기준색으로 후보 만들기/ }).click();
+  await page.getByLabel("주색 HEX", { exact: true }).fill("#ABCDEF");
+  await page.getByLabel("주색 HEX", { exact: true }).press("Tab");
+  const buttonColors = await page.getByRole("button", { name: "선택한 형식 받기 ↓" }).evaluate(button => {
+    const style = getComputedStyle(button);
+    return { foreground: style.color, background: style.backgroundColor };
+  });
+  expect(contrastRatio(parseColor(buttonColors.foreground)!, parseColor(buttonColors.background)!)).toBeGreaterThanOrEqual(4.5);
+  await page.locator(".export-preview > summary").click();
+  await expect(page.getByLabel("생성 파일 미리보기")).toContainText("--colors-palette-s1: #123456;");
+  await expect(page.getByLabel("생성 파일 미리보기")).toContainText("--colors-web-primary: #ABCDEF;");
+  const download = async (button: string) => {
+    const pending = page.waitForEvent("download");
+    await page.getByRole("button", { name: button, exact: true }).click();
+    const file = await pending;
+    return { name: file.suggestedFilename(), bytes: await readFile(await file.path()) };
+  };
+  const css = await download("선택한 형식 받기 ↓");
+  expect(css.name).toBe("colors-roles.css");
+  expect(css.bytes.toString()).toContain("--colors-palette-s1: #123456;");
+  expect(css.bytes.toString()).toContain("--colors-web-primary: #ABCDEF;");
+  const project = JSON.parse((await download("JSON 백업 ↓")).bytes.toString());
+  const color = (set: string, role: string) => {
+    const binding = project.roleSets[set][role];
+    return binding.overrideHex ?? project.swatches.find((s: { id: string }) => s.id === binding.swatchId).hex;
+  };
+  const formats = [
+    ["vscodeSettings", "colors-vscode-settings.json"], ["jetbrains", "colors.icls"],
+    ["vim", "colors.vim"], ["iterm", "colors.itermcolors"], ["putty", "colors-putty.reg"],
+  ];
+  for (const [format, name] of formats) {
+    await page.getByLabel("내보내기 형식").selectOption(format);
+    await expect(page.locator(".export-filename")).toContainText(name);
+    await expect(page.locator(".export-guide")).not.toBeEmpty();
+    const file = await download("선택한 형식 받기 ↓");
+    expect(file.name).toBe(name);
+    expect(file.bytes.length).toBeGreaterThan(100);
+    const text = file.bytes.toString(format === "putty" ? "utf16le" : "utf8");
+    if (format === "vscodeSettings") {
+      expect(JSON.parse(text)["workbench.colorCustomizations"]["editor.foreground"])
+        .toBe(color("editor", "foreground"));
+    } else if (format === "vim") {
+      expect(text).toContain(`highlight Normal guifg=${color("editor", "foreground")}`);
+    } else if (format === "putty") {
+      expect([...file.bytes.slice(0, 2)]).toEqual([255, 254]);
+      expect([...text.matchAll(/"Colour\d+"=/g)]).toHaveLength(22);
+      const hex = color("terminal", "foreground").slice(1);
+      const rgb = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16)).join(",");
+      expect(text).toContain(`"Colour0"="${rgb}"`);
+    } else {
+      const parsed = await page.evaluate(xml => {
+        const doc = new DOMParser().parseFromString(xml, "application/xml");
+        return { errors: doc.getElementsByTagName("parsererror").length,
+          root: doc.documentElement.nodeName,
+          foreground: doc.querySelector('attributes > option[name="TEXT"] option[name="FOREGROUND"]')?.getAttribute("value"),
+          itermEntries: doc.querySelectorAll("plist > dict > key").length };
+      }, text);
+      expect(parsed.errors).toBe(0);
+      expect(parsed.root).toBe(format === "jetbrains" ? "scheme" : "plist");
+      if (format === "jetbrains") expect(parsed.foreground).toBe(color("editor", "foreground").slice(1));
+      else expect(parsed.itermEntries).toBe(23);
+    }
+  }
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", await page.evaluate(() => document.body.clientWidth));
+  await page.locator(".extended-exports").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("export-center.png") });
+});
 
 test("multiple fixed and flexible inputs, deliberate adoption and export round trip", async ({ page }, testInfo) => {
   await page.goto("/");
