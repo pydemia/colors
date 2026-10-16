@@ -13,8 +13,8 @@
 | 브라우저 다운로드 | 데스크톱 Chromium·모바일 WebKit에서 파일명·내용·XML·UTF-16·좁은 폭 검사 |
 | 사이트 배포 | colors.pydemia.ai의 새 배포 SHA·asset와 실제 다운로드 흐름 확인 |
 
-앞의 세 기준은 아래 명령·관측으로 확인했다. 배포 결과는 실제 관측 뒤 기록한다.
-네 기준은 동일 가중치이며 구현·검증이 모두 끝난 항목만 완료로 센다.
+네 기준을 아래 명령·관측으로 확인했다. 완료 기준 4/4(100%).
+네 기준은 동일 가중치이며 이번 색 파일 다운로드 범위에 한정한다.
 
 ## 변경
 
@@ -81,4 +81,15 @@ PuTTY .reg를 현재 사용자 registry에 적용하지 않았다.
 
 ## 출시 기록
 
-배포 대기.
+- 버전: v0.2.1. 기능 코드 SHA: `5fa0af8ab358f8537e4209489d860e6aed9194d7`.
+- Vercel 배포 `dpl_4NFGBEU6Teqm8Ys4XE1XDHVJHej9`: READY, 위 SHA와 일치.
+- 배포 URL: `colors-5aphhpty4-pydemia-7822.vercel.app`.
+- `https://colors.pydemia.ai` alias 적용과 aliasError 없음 확인.
+- 실제 도메인의 JS `/assets/index-CLMwDsai.js`가 검증한 로컬 빌드와 일치.
+- 실제 도메인 대상 신규 다운로드 검사: 데스크톱·모바일 2개 통과.
+  CSS와 새 프로그램 파일의 색값·구조·인코딩을 해당 화면의 현재 프로젝트와 대조.
+- Edge 실제 화면에서 CSS 내용 복사를 실행하고 완료 알림 확인.
+  내보내기 화면의 경고·오류 console 기록 0개.
+- [배포된 내보내기 화면](screenshots/production-v0.2.1-exports.jpg):
+  JetBrains 선택, 파일명·받기·복사·적용 안내·XML 미리보기 확인.
+- 이 기록과 화면 증빙을 추가하는 후속 커밋은 런타임 코드를 변경하지 않는다.
