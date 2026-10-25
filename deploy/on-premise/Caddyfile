@@ -1,0 +1,31 @@
+{
+	admin off
+	auto_https off
+}
+
+http://:4380 {
+	bind 127.0.0.1
+	root * {$COLORS_SITE_ROOT}
+	encode zstd gzip
+	# Keep browser-only image processing free of CDN-injected analytics.
+	header Cache-Control "public, no-cache, no-transform"
+	header X-Content-Type-Options "nosniff"
+	header X-Colors-Origin "pydemia-server"
+
+	handle /assets/* {
+		root * {$COLORS_ASSET_ROOT}
+		@existing file {path}
+		header @existing Cache-Control "public, max-age=31536000, immutable, no-transform"
+		file_server
+	}
+
+	handle {
+		header /favicon.svg Cache-Control "no-store, no-transform"
+		file_server
+	}
+
+	handle_errors {
+		header Cache-Control "no-store, no-transform"
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}

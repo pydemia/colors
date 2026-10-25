@@ -4,6 +4,7 @@ coverage/
 playwright-report/
 test-results/
 .vercel/
+.worknotes/migration-artifacts/
 .env
 .env.*
 !.env.example

@@ -5,6 +5,10 @@ Colors는 콘셉트, 사진·이미지, 이야기 레시피, 하나 이상의 �
 
 사용 주소: [colors.pydemia.ai](https://colors.pydemia.ai)
 
+운영은 pydemia-server의 Caddy 사용자 서비스와 Cloudflare Tunnel을 사용합니다.
+배치·재시작·업데이트·복구 방법은 [온프레미스 배포](deploy/on-premise/README.md)에
+있습니다. Vercel Git 자동 배포는 중지하고 기존 배포는 복구용으로 보존합니다.
+
 ## 실행
 
 Node.js 24와 pnpm 10.34.5를 사용합니다.

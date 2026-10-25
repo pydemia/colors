@@ -1,0 +1,19 @@
+[Unit]
+Description=Colors static origin for Cloudflare Tunnel
+After=network.target
+
+[Service]
+Type=notify
+Environment=COLORS_SITE_ROOT=%h/workspaces/colors/current
+Environment=COLORS_ASSET_ROOT=%h/workspaces/colors/shared
+WorkingDirectory=%h/workspaces/colors
+ExecStart=%h/.local/share/colors/runtime/caddy-2.11.7/caddy run --config %h/workspaces/colors/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=10s
+NoNewPrivileges=true
+UMask=0027
+LimitNOFILE=65536
+
+[Install]
+WantedBy=default.target
